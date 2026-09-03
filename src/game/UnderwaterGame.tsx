@@ -129,7 +129,7 @@ const initialHud: HudState = {
 };
 
 const clamp = THREE.MathUtils.clamp;
-const PLAYER_COLLISION_RADIUS = 4.2;
+const PLAYER_COLLISION_RADIUS = 5.2;
 const SEA_FLOOR_Y = -219;
 const ICE_CEILING_Y = 5;
 
@@ -290,39 +290,134 @@ function createExplosionPool(count: number): ExplosionState[] {
   }));
 }
 
-function PlayerSubmarine({ variant }: { variant: string }) {
-  const bodyColor = variant === "manta-x1" ? "#547d82" : "#38575c";
-  const accent = variant === "manta-x1" ? "#ffd36a" : "#75f0df";
+function ZeroSkiffModel() {
+  const bodyColor = "#28536a";
+  const wingColor = "#1d455b";
+  const accent = "#75f0df";
+  const wingShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    shape.moveTo(0, -6.1);
+    shape.bezierCurveTo(-1.7, -5.7, -2.8, -3.6, -3.9, -2.2);
+    shape.bezierCurveTo(-5.3, -0.6, -7.1, 0.1, -7.8, 1.3);
+    shape.bezierCurveTo(-7, 2.5, -4.6, 3.1, -2.3, 2.5);
+    shape.lineTo(-1.45, 5.5);
+    shape.bezierCurveTo(-0.9, 5, -0.45, 4.4, 0, 3.8);
+    shape.bezierCurveTo(0.45, 4.4, 0.9, 5, 1.45, 5.5);
+    shape.lineTo(2.4, 2.5);
+    shape.bezierCurveTo(4.6, 3.1, 7, 2.5, 7.8, 1.3);
+    shape.bezierCurveTo(7.1, 0.1, 5.3, -0.6, 3.9, -2.2);
+    shape.bezierCurveTo(2.8, -3.6, 1.7, -5.7, 0, -6.1);
+    shape.closePath();
+    return shape;
+  }, []);
+
   return (
-    <>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <capsuleGeometry args={[1.8, 7.4, 8, 18]} />
-        <meshStandardMaterial color={bodyColor} roughness={0.44} metalness={0.65} />
+    <group scale={0.82}>
+      <mesh position={[0, 0.28, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <extrudeGeometry
+          args={[
+            wingShape,
+            {
+              depth: 0.5,
+              bevelEnabled: true,
+              bevelSize: 0.25,
+              bevelThickness: 0.18,
+              bevelSegments: 2,
+            },
+          ]}
+        />
+        <meshStandardMaterial
+          color={wingColor}
+          emissive="#0b2f42"
+          emissiveIntensity={0.12}
+          roughness={0.42}
+          metalness={0.72}
+          side={THREE.DoubleSide}
+        />
       </mesh>
-      <mesh position={[0, 1.25, 0.4]} scale={[1.1, 0.8, 2]}>
+
+      <mesh position={[0, 0.3, -0.8]} scale={[2.75, 1.35, 5.8]}>
+        <sphereGeometry args={[1, 28, 16]} />
+        <meshStandardMaterial
+          color={bodyColor}
+          emissive="#0b3144"
+          emissiveIntensity={0.16}
+          roughness={0.32}
+          metalness={0.78}
+        />
+      </mesh>
+
+      <mesh position={[0, -0.55, -1.1]} scale={[3.15, 0.78, 4.8]}>
+        <sphereGeometry args={[1, 24, 12]} />
+        <meshStandardMaterial color="#173846" roughness={0.5} metalness={0.64} />
+      </mesh>
+
+      <mesh position={[0, 1.35, -1.55]} scale={[1.45, 0.72, 2.35]}>
+        <sphereGeometry args={[1, 20, 12]} />
+        <meshPhysicalMaterial
+          color="#071b28"
+          emissive="#0b4b5e"
+          emissiveIntensity={0.28}
+          roughness={0.18}
+          metalness={0.72}
+          clearcoat={0.8}
+        />
+      </mesh>
+
+      <mesh position={[0, 1.05, 1.75]} scale={[0.58, 1.3, 2.4]}>
         <sphereGeometry args={[1, 16, 10]} />
-        <meshStandardMaterial color="#162d33" roughness={0.34} metalness={0.7} />
+        <meshStandardMaterial color="#173a4b" roughness={0.38} metalness={0.75} />
       </mesh>
-      <mesh position={[0, 0, 2.9]} rotation={[0, 0, Math.PI / 2]}>
-        <boxGeometry args={[0.22, 7.5, 1.5]} />
-        <meshStandardMaterial color="#29474d" metalness={0.7} roughness={0.5} />
+
+      <mesh position={[0, 1.62, 3.65]} rotation={[0.12, 0, 0]} scale={[0.18, 1.7, 1.5]}>
+        <boxGeometry />
+        <meshStandardMaterial color="#173a4b" metalness={0.72} roughness={0.44} />
       </mesh>
-      <mesh position={[0, 0.45, 4.5]} rotation={[0, 0, Math.PI / 2]}>
-        <boxGeometry args={[0.16, 4.4, 1.2]} />
-        <meshStandardMaterial color="#29474d" />
-      </mesh>
-      <mesh position={[-1.25, 0.15, -3.4]}>
+
+      {[-2.15, 2.15].map((x) => (
+        <group key={x} position={[x, -0.05, 3.45]}>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.72, 0.92, 2.9, 18]} />
+            <meshStandardMaterial color="#183744" metalness={0.84} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, 0, 1.5]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.58, 0.12, 8, 20]} />
+            <meshBasicMaterial color={accent} toneMapped={false} />
+          </mesh>
+          <pointLight position={[0, 0, 1.5]} color={accent} intensity={2.4} distance={18} />
+        </group>
+      ))}
+
+      <mesh position={[-1.65, 0.05, -4.65]}>
         <sphereGeometry args={[0.28, 10, 8]} />
         <meshBasicMaterial color={accent} toneMapped={false} />
         <pointLight color={accent} intensity={3} distance={24} />
       </mesh>
-      <mesh position={[1.25, 0.15, -3.4]}>
+      <mesh position={[1.65, 0.05, -4.65]}>
         <sphereGeometry args={[0.28, 10, 8]} />
         <meshBasicMaterial color={accent} toneMapped={false} />
         <pointLight color={accent} intensity={3} distance={24} />
       </mesh>
+
+      {[-1, 1].map((side) => (
+        <mesh
+          key={side}
+          position={[side * 3.4, 0.32, 1.65]}
+          rotation={[0, side * -0.12, side * 0.08]}
+          scale={[2.8, 0.16, 0.55]}
+        >
+          <boxGeometry />
+          <meshStandardMaterial color="#386f83" metalness={0.7} roughness={0.35} />
+        </mesh>
+      ))}
+
+      <mesh position={[0, 0.48, -4.7]} scale={[0.85, 0.12, 0.9]}>
+        <boxGeometry />
+        <meshBasicMaterial color="#d6f5f2" toneMapped={false} />
+      </mesh>
+
       <spotLight
-        position={[0, 0, -4]}
+        position={[0, 0, -5.2]}
         target-position={[0, 0, -30]}
         color="#b8fff5"
         intensity={14}
@@ -330,8 +425,115 @@ function PlayerSubmarine({ variant }: { variant: string }) {
         penumbra={0.75}
         distance={85}
       />
-    </>
+    </group>
   );
+}
+
+function MantaX1Model() {
+  const accent = "#ffd36a";
+  return (
+    <group scale={0.88}>
+      {[-2.65, 2.65].map((x) => (
+        <group key={x} position={[x, 0, -0.15]}>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <capsuleGeometry args={[1.25, 7.8, 8, 18]} />
+            <meshStandardMaterial
+              color="#526568"
+              emissive="#283638"
+              emissiveIntensity={0.18}
+              metalness={0.84}
+              roughness={0.3}
+            />
+          </mesh>
+          <mesh position={[0, 0, 4.9]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[1.05, 1.25, 1.3, 18]} />
+            <meshStandardMaterial color="#28383a" metalness={0.88} roughness={0.26} />
+          </mesh>
+          <mesh position={[0, 0, 5.65]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.75, 0.15, 8, 22]} />
+            <meshBasicMaterial color={accent} toneMapped={false} />
+          </mesh>
+          <pointLight position={[0, 0, 5.6]} color={accent} intensity={2.8} distance={20} />
+          <mesh position={[0, 1.45, 3.7]} rotation={[-0.2, 0, 0]} scale={[0.16, 1.6, 1.3]}>
+            <boxGeometry />
+            <meshStandardMaterial color="#394b4d" metalness={0.74} roughness={0.4} />
+          </mesh>
+        </group>
+      ))}
+
+      <mesh position={[0, 0.25, -1.3]} scale={[2.1, 1.2, 3.7]}>
+        <sphereGeometry args={[1, 24, 14]} />
+        <meshStandardMaterial
+          color="#40575b"
+          emissive="#243638"
+          emissiveIntensity={0.16}
+          metalness={0.8}
+          roughness={0.32}
+        />
+      </mesh>
+
+      <mesh position={[0, 1.35, -1.7]} scale={[1.25, 0.68, 2.15]}>
+        <sphereGeometry args={[1, 20, 12]} />
+        <meshPhysicalMaterial
+          color="#111d20"
+          emissive="#564416"
+          emissiveIntensity={0.25}
+          metalness={0.68}
+          roughness={0.2}
+          clearcoat={0.9}
+        />
+      </mesh>
+
+      <mesh position={[0, -0.05, 0.4]} scale={[6.8, 0.28, 1.65]}>
+        <boxGeometry />
+        <meshStandardMaterial color="#34494d" metalness={0.8} roughness={0.36} />
+      </mesh>
+
+      {[-1, 1].map((side) => (
+        <mesh
+          key={side}
+          position={[side * 4.65, 0.05, 1.2]}
+          rotation={[0, side * -0.18, side * 0.06]}
+          scale={[2.2, 0.22, 1.05]}
+        >
+          <boxGeometry />
+          <meshStandardMaterial color="#617174" metalness={0.78} roughness={0.34} />
+        </mesh>
+      ))}
+
+      <mesh position={[0, -0.35, 2.7]} scale={[1.3, 0.5, 2.2]}>
+        <sphereGeometry args={[1, 16, 10]} />
+        <meshStandardMaterial color="#283b3e" metalness={0.82} roughness={0.35} />
+      </mesh>
+
+      {[-2.65, 2.65].map((x) => (
+        <mesh key={x} position={[x, 0.05, -4.75]}>
+          <sphereGeometry args={[0.3, 10, 8]} />
+          <meshBasicMaterial color={accent} toneMapped={false} />
+          <pointLight color={accent} intensity={3} distance={24} />
+        </mesh>
+      ))}
+
+      <mesh position={[0, 0.65, -4.45]} scale={[1.05, 0.14, 0.75]}>
+        <boxGeometry />
+        <meshBasicMaterial color="#fff0ac" toneMapped={false} />
+      </mesh>
+
+      <spotLight
+        position={[0, 0, -5.3]}
+        target-position={[0, 0, -30]}
+        color="#fff4bd"
+        intensity={16}
+        angle={0.32}
+        penumbra={0.7}
+        distance={90}
+      />
+    </group>
+  );
+}
+
+function PlayerSubmarine({ variant }: { variant: string }) {
+  return variant === "manta-x1" ? <MantaX1Model /> : <ZeroSkiffModel />;
 }
 
 function EnemySubmarine({ kind }: { kind: EnemyKind }) {
@@ -914,7 +1116,7 @@ function GameScene({
 
       playerMesh.current.position.copy(playerPosition.current);
 
-      const cameraBack = new THREE.Vector3(0, 5.5, 17).applyQuaternion(playerMesh.current.quaternion);
+      const cameraBack = new THREE.Vector3(0, 6.5, 22).applyQuaternion(playerMesh.current.quaternion);
       const desiredCamera = playerPosition.current.clone().add(cameraBack);
       camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 4.4));
       cameraTarget.current.lerp(
