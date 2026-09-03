@@ -144,3 +144,6 @@ vite.config.ts.timestamp-*
 .vite/
 # macOS
 .DS_Store
+
+# Reference images
+sample/
