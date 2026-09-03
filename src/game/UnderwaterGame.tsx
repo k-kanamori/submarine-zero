@@ -20,6 +20,8 @@ type EnemyState = {
   fireCooldown: number;
   detectedUntil: number;
   alerted: boolean;
+  spawned: boolean;
+  spawnAt: number;
   alive: boolean;
   mesh: THREE.Group | null;
 };
@@ -32,6 +34,7 @@ type ProjectileState = {
   position: THREE.Vector3;
   velocity: THREE.Vector3;
   targetId: string | null;
+  age: number;
   fuel: number;
   falling: boolean;
   sinkTime: number;
@@ -212,6 +215,7 @@ function createEnemies(): EnemyState[] {
     [-80, -92, -345], [20, -105, -405], [95, -110, -465], [-65, -122, -515],
     [35, -126, -560], [-105, -140, -610],
   ];
+  const spawnTimes = [0, 0, 12, 24, 36, 48, 60, 72, 84, 96];
   const kinds: EnemyKind[] = ["scout", "hunter", "layer"];
   const escorts = positions.map((position, index): EnemyState => ({
     id: "escort-" + index,
@@ -223,6 +227,8 @@ function createEnemies(): EnemyState[] {
     fireCooldown: 2 + index * 0.35,
     detectedUntil: 0,
     alerted: false,
+    spawned: index < 2,
+    spawnAt: spawnTimes[index],
     alive: true,
     mesh: null,
   }));
@@ -236,6 +242,8 @@ function createEnemies(): EnemyState[] {
     fireCooldown: 3,
     detectedUntil: 0,
     alerted: false,
+    spawned: true,
+    spawnAt: 0,
     alive: true,
     mesh: null,
   });
@@ -251,6 +259,7 @@ function createProjectilePool(count: number): ProjectileState[] {
     position: new THREE.Vector3(),
     velocity: new THREE.Vector3(),
     targetId: null,
+    age: 0,
     fuel: 0,
     falling: false,
     sinkTime: 0,
@@ -493,6 +502,7 @@ function GameScene({
   const completed = useRef(false);
   const completionTimer = useRef(0);
   const terrainImpactCooldown = useRef(0);
+  const lastEnemySpawnAt = useRef(0);
   const lastHudUpdate = useRef(0);
   const dialogue = useRef(initialHud.dialogue);
   const dialogueFlags = useRef(new Set<string>());
@@ -587,6 +597,7 @@ function GameScene({
       projectile.position.copy(origin);
       projectile.velocity.copy(direction).normalize().multiplyScalar(speed);
       projectile.targetId = targetId;
+      projectile.age = 0;
       projectile.fuel = friendly ? (guided ? 9 : 7) : 8;
       projectile.falling = false;
       projectile.sinkTime = 0;
@@ -603,7 +614,7 @@ function GameScene({
     synth.current.sonar();
     enemies.current.forEach((enemy) => {
       const distance = enemy.position.distanceTo(playerPosition.current);
-      if (enemy.alive && distance < 650) {
+      if (enemy.alive && enemy.spawned && distance < 650) {
         enemy.detectedUntil = elapsed.current + 5.5;
         enemy.alerted = true;
       }
@@ -616,6 +627,7 @@ function GameScene({
       .filter(
         (enemy) =>
           enemy.alive &&
+          enemy.spawned &&
           (enemy.detectedUntil > elapsed.current || enemy.position.distanceTo(playerPosition.current) < 115),
       )
       .sort(
@@ -928,6 +940,33 @@ function GameScene({
       }
     }
 
+    const activeEscortCount = enemies.current.filter(
+      (enemy) => enemy.kind !== "boss" && enemy.alive && enemy.spawned,
+    ).length;
+    const nextEscort = enemies.current.find(
+      (enemy) =>
+        enemy.kind !== "boss" &&
+        enemy.alive &&
+        !enemy.spawned &&
+        enemy.spawnAt <= elapsed.current,
+    );
+    if (
+      nextEscort &&
+      activeEscortCount < 3 &&
+      elapsed.current - lastEnemySpawnAt.current >= 8
+    ) {
+      nextEscort.spawned = true;
+      nextEscort.fireCooldown = 3.5;
+      nextEscort.detectedUntil = elapsed.current + 3;
+      lastEnemySpawnAt.current = elapsed.current;
+      spawnExplosion(nextEscort.position, 4.5, "#ff7467");
+      synth.current.warning();
+      setDialogue(
+        "reinforcement-" + nextEscort.id,
+        "NIX「新しい推進音を確認。増援が一隻、海域へ入った」",
+      );
+    }
+
     const boss = enemies.current.find((enemy) => enemy.kind === "boss");
     if (boss && boss.alive && (playerPosition.current.z < -520 || kills.current >= 8)) {
       if (!boss.alerted) {
@@ -940,8 +979,8 @@ function GameScene({
 
     enemies.current.forEach((enemy, enemyIndex) => {
       if (!enemy.mesh) return;
-      enemy.mesh.visible = enemy.alive;
-      if (!enemy.alive) return;
+      enemy.mesh.visible = enemy.alive && enemy.spawned;
+      if (!enemy.alive || !enemy.spawned) return;
       const distance = enemy.position.distanceTo(playerPosition.current);
       if (distance < 90) enemy.detectedUntil = now + 1;
       const active = enemy.alerted || distance < 250;
@@ -1000,7 +1039,10 @@ function GameScene({
       if (mine.ttl <= 0) mine.active = false;
       if (mine.active) {
         const target = enemies.current.find(
-          (enemy) => enemy.alive && enemy.position.distanceTo(mine.position) < (enemy.kind === "boss" ? 35 : 16),
+          (enemy) =>
+            enemy.alive &&
+            enemy.spawned &&
+            enemy.position.distanceTo(mine.position) < (enemy.kind === "boss" ? 35 : 16),
         );
         if (target) {
           target.hp -= 85;
@@ -1021,6 +1063,7 @@ function GameScene({
         return;
       }
 
+      projectile.age += dt;
       if (!projectile.falling) {
         projectile.fuel -= dt;
         if (projectile.fuel <= 0) {
@@ -1056,7 +1099,7 @@ function GameScene({
           targetPosition = nearestDecoy?.position ?? playerPosition.current;
         } else {
           const target = enemies.current.find(
-            (enemy) => enemy.id === projectile.targetId && enemy.alive,
+            (enemy) => enemy.id === projectile.targetId && enemy.alive && enemy.spawned,
           );
           targetPosition = target?.position ?? null;
         }
@@ -1070,6 +1113,10 @@ function GameScene({
 
       const hitTerrain =
         projectile.position.y <= SEA_FLOOR_Y + 0.8 ||
+        projectile.position.y >= ICE_CEILING_Y - 0.4 ||
+        Math.abs(projectile.position.x) >= 155 ||
+        projectile.position.z <= -900 ||
+        projectile.position.z >= 80 ||
         TERRAIN_COLLIDERS.some(
           (collider) =>
             Math.abs(projectile.position.x - collider.center.x) <= collider.halfSize.x &&
@@ -1090,6 +1137,7 @@ function GameScene({
         const target = enemies.current.find(
           (enemy) =>
             enemy.alive &&
+            enemy.spawned &&
             enemy.position.distanceTo(projectile.position) < (enemy.kind === "boss" ? 28 : 5.2),
         );
         if (target) {
@@ -1136,6 +1184,59 @@ function GameScene({
       projectile.mesh.position.copy(projectile.position);
       if (projectile.velocity.lengthSq() > 0.1) {
         projectile.mesh.lookAt(projectile.position.clone().add(projectile.velocity));
+      }
+    });
+
+    for (let firstIndex = 0; firstIndex < projectiles.current.length; firstIndex += 1) {
+      const first = projectiles.current[firstIndex];
+      if (!first.active || first.age < 0.6) continue;
+      for (
+        let secondIndex = firstIndex + 1;
+        secondIndex < projectiles.current.length;
+        secondIndex += 1
+      ) {
+        const second = projectiles.current[secondIndex];
+        if (!second.active || second.age < 0.6) continue;
+        if (first.position.distanceToSquared(second.position) > 1.7) continue;
+
+        const impactPoint = first.position.clone().add(second.position).multiplyScalar(0.5);
+        first.active = false;
+        second.active = false;
+        if (first.mesh) first.mesh.visible = false;
+        if (second.mesh) second.mesh.visible = false;
+        spawnExplosion(impactPoint, 6.5, "#ffbd72");
+        synth.current.explosion();
+        setDialogue("torpedo-intercept", "NIX「魚雷同士の接触を確認。どちらも爆発した」");
+        break;
+      }
+    }
+
+    projectiles.current.forEach((projectile) => {
+      if (!projectile.active || projectile.age < 0.25) return;
+
+      const hitMine = mines.current.find(
+        (mine) => mine.active && mine.position.distanceToSquared(projectile.position) < 4,
+      );
+      if (hitMine) {
+        projectile.active = false;
+        hitMine.active = false;
+        if (projectile.mesh) projectile.mesh.visible = false;
+        if (hitMine.mesh) hitMine.mesh.visible = false;
+        spawnExplosion(projectile.position, 7, "#ffc070");
+        synth.current.explosion();
+        return;
+      }
+
+      const hitDecoy = decoys.current.find(
+        (decoy) => decoy.active && decoy.position.distanceToSquared(projectile.position) < 6.25,
+      );
+      if (hitDecoy) {
+        projectile.active = false;
+        hitDecoy.active = false;
+        if (projectile.mesh) projectile.mesh.visible = false;
+        if (hitDecoy.mesh) hitDecoy.mesh.visible = false;
+        spawnExplosion(projectile.position, 5, "#ffe094");
+        synth.current.explosion();
       }
     });
 
@@ -1193,10 +1294,12 @@ function GameScene({
     if (now - lastHudUpdate.current > 0.08) {
       lastHudUpdate.current = now;
       const currentBoss = enemies.current.find((enemy) => enemy.kind === "boss");
-      const locked = enemies.current.find((enemy) => enemy.id === lockId.current && enemy.alive);
+      const locked = enemies.current.find(
+        (enemy) => enemy.id === lockId.current && enemy.alive && enemy.spawned,
+      );
       if (!locked) lockId.current = null;
       const contacts = enemies.current
-        .filter((enemy) => enemy.alive && enemy.detectedUntil > now)
+        .filter((enemy) => enemy.alive && enemy.spawned && enemy.detectedUntil > now)
         .map((enemy) => {
           const relative = enemy.position.clone().sub(playerPosition.current);
           return {
@@ -1253,6 +1356,7 @@ function GameScene({
           key={enemy.id}
           ref={(group) => { enemy.mesh = group; }}
           position={enemy.position.toArray()}
+          visible={enemy.alive && enemy.spawned}
         >
           <EnemySubmarine kind={enemy.kind} />
           <group name="contact-marker" position={[0, enemy.kind === "boss" ? 35 : 6, 0]}>
