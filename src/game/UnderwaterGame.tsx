@@ -8,6 +8,7 @@ import * as THREE from "three";
 import type { MissionResult } from "./store";
 import { sphereBoxPenetration } from "./collision";
 import RyuouModel from "./RyuouModel";
+import SonarSurfaceMaterial, { SONAR_RANGE, SONAR_SPEED, SONAR_TRAVEL_TIME, type SonarPulse } from "./SonarSurfaceMaterial";
 
 type EnemyKind = "scout" | "hunter" | "layer" | "boss";
 type WeaponKind = "guided" | "manual";
@@ -132,8 +133,14 @@ const initialHud: HudState = {
 
 const clamp = THREE.MathUtils.clamp;
 const PLAYER_COLLISION_RADIUS = 5.2;
-const SEA_FLOOR_Y = -219;
+const SEA_FLOOR_Y = -279;
 const ICE_CEILING_Y = 5;
+// Shared by navigation, torpedo collision, and the rendered environment.
+const SEA_HALF_WIDTH = 240;
+const SEA_BACK_Z = 120;
+const SEA_FRONT_Z = -1120;
+const SEA_LENGTH = SEA_BACK_Z - SEA_FRONT_Z;
+const SEA_CENTER_Z = (SEA_BACK_Z + SEA_FRONT_Z) / 2;
 const DISCOVERY_POSITION = new THREE.Vector3(72, -106, -432);
 
 // These slots stay in the scene even when idle (intensity 0). Changing the
@@ -145,9 +152,9 @@ const ICE_FORMATIONS: IceFormation[] = Array.from({ length: 54 }, (_, index) => 
   const side = index % 2 === 0 ? -1 : 1;
   return {
     position: [
-      side * (55 + (index % 6) * 12),
+      side * (80 + (index % 6) * 22),
       -8 - ((index * 17) % 75),
-      30 - row * 105 - ((index * 29) % 70),
+      70 - row * 130 - ((index * 29) % 70),
     ],
     scale: [
       12 + ((index * 13) % 24),
@@ -404,21 +411,21 @@ function PlayerSubmarine({ variant }: { variant: string }) {
   return variant === "manta-x1" ? <MantaX1Model /> : <RyuouModel />;
 }
 
-function EnemySubmarine({ kind }: { kind: EnemyKind }) {
+function EnemySubmarine({ kind, pulse }: { kind: EnemyKind; pulse: SonarPulse }) {
   if (kind === "boss") {
     return (
       <>
         <mesh scale={[2.8, 0.7, 2.8]}>
           <sphereGeometry args={[10, 32, 14]} />
-          <meshStandardMaterial color="#27383b" metalness={0.84} roughness={0.32} />
+          <SonarSurfaceMaterial pulse={pulse} enemy color="#27383b" metalness={0.84} roughness={0.32} />
         </mesh>
         <mesh position={[0, 4.2, 0]} scale={[1.8, 0.6, 1.8]}>
           <sphereGeometry args={[5, 24, 10]} />
-          <meshStandardMaterial color="#17282d" metalness={0.75} />
+          <SonarSurfaceMaterial pulse={pulse} enemy color="#17282d" metalness={0.75} />
         </mesh>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <torusGeometry args={[26, 1.1, 10, 48]} />
-          <meshStandardMaterial color="#4b6063" metalness={0.9} roughness={0.25} />
+          <SonarSurfaceMaterial pulse={pulse} enemy color="#4b6063" metalness={0.9} roughness={0.25} />
         </mesh>
         {[0, 1, 2, 3, 4, 5].map((index) => {
           const angle = index * Math.PI / 3;
@@ -438,11 +445,11 @@ function EnemySubmarine({ kind }: { kind: EnemyKind }) {
     <>
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <capsuleGeometry args={[1.5, kind === "hunter" ? 6.5 : 5, 7, 14]} />
-        <meshStandardMaterial color={color} metalness={0.7} roughness={0.45} />
+        <SonarSurfaceMaterial pulse={pulse} enemy color={color} metalness={0.7} roughness={0.45} />
       </mesh>
       <mesh position={[0, 0, 2.4]}>
         <boxGeometry args={[5.5, 0.25, 1.4]} />
-        <meshStandardMaterial color="#452c31" />
+        <SonarSurfaceMaterial pulse={pulse} enemy color="#452c31" />
       </mesh>
       <mesh position={[0, 0.3, -3]}>
         <sphereGeometry args={[0.32, 8, 6]} />
@@ -467,7 +474,7 @@ function TorpedoModel({ friendly }: { friendly: boolean }) {
   );
 }
 
-function IceFormations() {
+function IceFormations({ pulse }: { pulse: SonarPulse }) {
   const mesh = useRef<THREE.InstancedMesh>(null);
   useLayoutEffect(() => {
     if (!mesh.current) return;
@@ -488,12 +495,12 @@ function IceFormations() {
   return (
     <instancedMesh ref={mesh} args={[undefined, undefined, ICE_FORMATIONS.length]}>
       <dodecahedronGeometry args={[1, 0]} />
-      <meshStandardMaterial roughness={0.88} />
+      <SonarSurfaceMaterial pulse={pulse} roughness={0.88} />
     </instancedMesh>
   );
 }
 
-function IceEnvironment() {
+function IceEnvironment({ pulse }: { pulse: SonarPulse }) {
   const particles = useMemo(() => {
     const array = new Float32Array(900);
     for (let index = 0; index < array.length; index += 3) {
@@ -501,34 +508,34 @@ function IceEnvironment() {
       const noiseA = Math.sin(seed * 12.9898) * 43758.5453;
       const noiseB = Math.sin(seed * 78.233) * 19341.349;
       const noiseC = Math.sin(seed * 39.425) * 96321.517;
-      array[index] = ((noiseA - Math.floor(noiseA)) - 0.5) * 300;
-      array[index + 1] = -(noiseB - Math.floor(noiseB)) * 220;
-      array[index + 2] = 80 - (noiseC - Math.floor(noiseC)) * 1000;
+      array[index] = ((noiseA - Math.floor(noiseA)) - 0.5) * SEA_HALF_WIDTH * 2;
+      array[index + 1] = SEA_FLOOR_Y + (noiseB - Math.floor(noiseB)) * (ICE_CEILING_Y - SEA_FLOOR_Y);
+      array[index + 2] = SEA_BACK_Z - (noiseC - Math.floor(noiseC)) * SEA_LENGTH;
     }
     return array;
   }, []);
 
   return (
     <>
-      <mesh position={[0, 14, -420]} scale={[280, 10, 1100]}>
+      <mesh position={[0, ICE_CEILING_Y + 5, SEA_CENTER_Z]} scale={[SEA_HALF_WIDTH * 2 + 80, 10, SEA_LENGTH + 80]}>
         <boxGeometry />
-        <meshStandardMaterial color="#7cb7b8" roughness={0.85} />
+        <SonarSurfaceMaterial pulse={pulse} color="#7cb7b8" roughness={0.85} />
       </mesh>
-      <mesh position={[0, -225, -430]} scale={[250, 12, 1100]}>
+      <mesh position={[0, SEA_FLOOR_Y - 6, SEA_CENTER_Z]} scale={[SEA_HALF_WIDTH * 2 + 80, 12, SEA_LENGTH + 80]}>
         <boxGeometry />
-        <meshStandardMaterial color="#061416" roughness={1} />
+        <SonarSurfaceMaterial pulse={pulse} color="#061416" roughness={1} />
       </mesh>
-      <IceFormations />
+      <IceFormations pulse={pulse} />
       <group position={[0, -112, -420]}>
         {[-42, -14, 14, 42].map((x) => (
           <mesh key={x} position={[x, 0, 0]} scale={[4, 55, 4]}>
             <boxGeometry />
-            <meshStandardMaterial color="#12282b" metalness={0.7} roughness={0.55} />
+            <SonarSurfaceMaterial pulse={pulse} color="#12282b" metalness={0.7} roughness={0.55} />
           </mesh>
         ))}
         <mesh position={[0, 35, 0]} scale={[50, 3, 8]}>
           <boxGeometry />
-          <meshStandardMaterial color="#142c30" metalness={0.72} />
+          <SonarSurfaceMaterial pulse={pulse} color="#142c30" metalness={0.72} />
         </mesh>
       </group>
       <points>
@@ -576,6 +583,10 @@ const GameScene = memo(function GameScene({
   const weaponCooldown = useRef(0);
   const sonarCooldown = useRef(0);
   const sonarAge = useRef(99);
+  const sonarPulse = useMemo<SonarPulse>(() => ({
+    origin: { value: new THREE.Vector3() },
+    age: { value: 99 },
+  }), []);
   const lockId = useRef<string | null>(null);
   const enemies = useMemo(() => createEnemies(), []);
   const projectiles = useMemo(() => createProjectilePool(72), []);
@@ -736,16 +747,17 @@ const GameScene = memo(function GameScene({
     if (sonarCooldown.current > 0 || respawnTimer.current > 0) return;
     sonarCooldown.current = 6;
     sonarAge.current = 0;
+    sonarPulse.origin.value.copy(playerPosition.current);
     synth.current.sonar();
     enemies.forEach((enemy) => {
       const distance = enemy.position.distanceTo(playerPosition.current);
-      if (enemy.alive && enemy.spawned && distance < 650) {
+      if (enemy.alive && enemy.spawned && distance < SONAR_RANGE) {
         enemy.detectedUntil = elapsed.current + 5.5;
         enemy.alerted = true;
       }
     });
     setDialogue("first-sonar", "NIX「こちらの音も丸聞こえだ。さあ、何が返事をするかな」");
-  }, [enemies, setDialogue]);
+  }, [enemies, setDialogue, sonarPulse]);
 
   const selectLock = useCallback(() => {
     const candidates = enemies
@@ -930,16 +942,16 @@ const GameScene = memo(function GameScene({
         }
       };
 
-      if (playerPosition.current.x - PLAYER_COLLISION_RADIUS < -155) {
+      if (playerPosition.current.x - PLAYER_COLLISION_RADIUS < -SEA_HALF_WIDTH) {
         registerCollision(
           scratch.contactNormal.set(1, 0, 0),
-          -155 - (playerPosition.current.x - PLAYER_COLLISION_RADIUS),
+          -SEA_HALF_WIDTH - (playerPosition.current.x - PLAYER_COLLISION_RADIUS),
         );
       }
-      if (playerPosition.current.x + PLAYER_COLLISION_RADIUS > 155) {
+      if (playerPosition.current.x + PLAYER_COLLISION_RADIUS > SEA_HALF_WIDTH) {
         registerCollision(
           scratch.contactNormal.set(-1, 0, 0),
-          playerPosition.current.x + PLAYER_COLLISION_RADIUS - 155,
+          playerPosition.current.x + PLAYER_COLLISION_RADIUS - SEA_HALF_WIDTH,
         );
       }
       if (playerPosition.current.y + PLAYER_COLLISION_RADIUS > ICE_CEILING_Y) {
@@ -954,16 +966,16 @@ const GameScene = memo(function GameScene({
           SEA_FLOOR_Y - (playerPosition.current.y - PLAYER_COLLISION_RADIUS),
         );
       }
-      if (playerPosition.current.z - PLAYER_COLLISION_RADIUS < -900) {
+      if (playerPosition.current.z - PLAYER_COLLISION_RADIUS < SEA_FRONT_Z) {
         registerCollision(
           scratch.contactNormal.set(0, 0, 1),
-          -900 - (playerPosition.current.z - PLAYER_COLLISION_RADIUS),
+          SEA_FRONT_Z - (playerPosition.current.z - PLAYER_COLLISION_RADIUS),
         );
       }
-      if (playerPosition.current.z + PLAYER_COLLISION_RADIUS > 80) {
+      if (playerPosition.current.z + PLAYER_COLLISION_RADIUS > SEA_BACK_Z) {
         registerCollision(
           scratch.contactNormal.set(0, 0, -1),
-          playerPosition.current.z + PLAYER_COLLISION_RADIUS - 80,
+          playerPosition.current.z + PLAYER_COLLISION_RADIUS - SEA_BACK_Z,
         );
       }
 
@@ -1215,9 +1227,9 @@ const GameScene = memo(function GameScene({
       const hitTerrain =
         projectile.position.y <= SEA_FLOOR_Y + 0.8 ||
         projectile.position.y >= ICE_CEILING_Y - 0.4 ||
-        Math.abs(projectile.position.x) >= 155 ||
-        projectile.position.z <= -900 ||
-        projectile.position.z >= 80 ||
+        Math.abs(projectile.position.x) >= SEA_HALF_WIDTH ||
+        projectile.position.z <= SEA_FRONT_Z ||
+        projectile.position.z >= SEA_BACK_Z ||
         TERRAIN_COLLIDERS.some(
           (collider) =>
             Math.abs(projectile.position.x - collider.center.x) <= collider.halfSize.x &&
@@ -1372,13 +1384,14 @@ const GameScene = memo(function GameScene({
       }
     });
 
+    sonarPulse.age.value = sonarAge.current;
     if (sonarMesh.current) {
-      const active = sonarAge.current < 2.1;
+      const active = sonarAge.current < SONAR_TRAVEL_TIME;
       sonarMesh.current.visible = active;
-      sonarMesh.current.position.copy(playerPosition.current);
-      sonarMesh.current.scale.setScalar(10 + sonarAge.current * 260);
+      sonarMesh.current.position.copy(sonarPulse.origin.value);
+      sonarMesh.current.scale.setScalar(Math.max(0.01, sonarAge.current * SONAR_SPEED));
       const material = sonarMesh.current.material as THREE.MeshBasicMaterial;
-      material.opacity = active ? Math.max(0, 0.22 * (1 - sonarAge.current / 2.1)) : 0;
+      material.opacity = active ? Math.max(0, 0.22 * (1 - sonarAge.current / SONAR_TRAVEL_TIME)) : 0;
     }
 
     if (discoveryMesh.current) {
@@ -1441,7 +1454,7 @@ const GameScene = memo(function GameScene({
         speed: playerVelocity.current.length(),
         cooldown: weaponCooldown.current,
         sonarCooldown: sonarCooldown.current,
-        sonarActive: sonarAge.current < 2.1,
+        sonarActive: sonarAge.current < SONAR_TRAVEL_TIME,
         weapon: weapon.current,
         lockedName: locked ? (locked.kind === "boss" ? "UNKNOWN DISC" : locked.kind.toUpperCase()) : null,
         lockedDistance: locked ? locked.position.distanceTo(playerPosition.current) : 0,
@@ -1465,7 +1478,7 @@ const GameScene = memo(function GameScene({
       <color attach="background" args={["#06242a"]} />
       <ambientLight color="#6ca9a7" intensity={0.3} />
       <directionalLight position={[30, 80, 10]} color="#b7f4ee" intensity={1.25} />
-      <IceEnvironment />
+      <IceEnvironment pulse={sonarPulse} />
       {Array.from({ length: EFFECT_LIGHT_COUNT }, (_, index) => (
         <pointLight
           key={index}
@@ -1486,7 +1499,7 @@ const GameScene = memo(function GameScene({
           position={enemy.position.toArray()}
           visible={enemy.alive && enemy.spawned}
         >
-          <EnemySubmarine kind={enemy.kind} />
+          <EnemySubmarine kind={enemy.kind} pulse={sonarPulse} />
           <group name="contact-marker" position={[0, enemy.kind === "boss" ? 35 : 6, 0]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
               <torusGeometry args={[enemy.kind === "boss" ? 8 : 2.8, 0.16, 8, 28]} />
@@ -1551,7 +1564,7 @@ const GameScene = memo(function GameScene({
         </mesh>
         <mesh scale={[2.5, 0.7, 5]} rotation={[0, 0.2, 0]}>
           <sphereGeometry args={[1, 14, 8]} />
-          <meshStandardMaterial color="#5d6865" metalness={0.7} />
+          <SonarSurfaceMaterial pulse={sonarPulse} color="#5d6865" metalness={0.7} />
         </mesh>
       </group>
     </>
