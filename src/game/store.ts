@@ -44,7 +44,7 @@ export const useGameStore = create<GameStore>()(
           lastResult: result,
           bestScore: Math.max(state.bestScore, result.score),
           unlockedVehicles: result.vehicleDiscovered
-            ? Array.from(new Set([...state.unlockedVehicles, "manta-x1"]))
+            ? Array.from(new Set([...state.unlockedVehicles, "corback"]))
             : state.unlockedVehicles,
         })),
       resetProgress: () =>
@@ -57,17 +57,21 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: "deep-zero-save-v1",
-      version: 1,
+      version: 2,
       migrate: (persisted) => {
         const saved = persisted as Partial<GameStore> | undefined;
+        const unlockedVehicles = Array.from(new Set([
+          "ryuou",
+          ...(saved?.unlockedVehicles ?? [])
+            .map((id) => id === "manta-x1" ? "corback" : id)
+            .filter((id) => id === "ryuou" || id === "corback"),
+        ]));
+        const selected = saved?.selectedVehicle === "manta-x1" ? "corback" : saved?.selectedVehicle;
         return {
           bestScore: saved?.bestScore ?? 0,
-          // Introduce the new player craft once, preserving scores and unlocks.
-          selectedVehicle: "ryuou",
-          unlockedVehicles: Array.from(new Set([
-            "ryuou",
-            ...(saved?.unlockedVehicles ?? []).filter((id) => id !== "zero-skiff"),
-          ])),
+          // Preserve the second craft's unlock and current selection in old saves.
+          selectedVehicle: selected && unlockedVehicles.includes(selected) ? selected : "ryuou",
+          unlockedVehicles,
         };
       },
       partialize: (state) => ({

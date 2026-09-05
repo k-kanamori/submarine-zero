@@ -117,12 +117,12 @@ export default function GameShell() {
                   <span>機動性 A / 耐久 C</span>
                 </button>
                 <button
-                  disabled={!store.unlockedVehicles.includes("manta-x1")}
-                  className={store.selectedVehicle === "manta-x1" ? "selected" : ""}
-                  onClick={() => store.selectVehicle("manta-x1")}
+                  disabled={!store.unlockedVehicles.includes("corback")}
+                  className={"corback-option " + (store.selectedVehicle === "corback" ? "selected" : "")}
+                  onClick={() => store.selectVehicle("corback")}
                 >
-                  <strong>MANTA X-1</strong>
-                  <span>{store.unlockedVehicles.includes("manta-x1") ? "機動性 B / 耐久 A" : "未発見"}</span>
+                  <strong>コーバック号 <small>CORBACK II</small></strong>
+                  <span>{store.unlockedVehicles.includes("corback") ? "機動性 B / 耐久 A" : "未発見"}</span>
                 </button>
               </div>
               <div className="briefing-actions">
@@ -164,7 +164,7 @@ export default function GameShell() {
             {store.lastResult.vehicleDiscovered && (
               <div className="unlock-notice">
                 <span>NEW VEHICLE</span>
-                <strong>MANTA X-1 をアンロック</strong>
+                <strong>コーバック号をアンロック</strong>
               </div>
             )}
             <blockquote>

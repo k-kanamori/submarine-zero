@@ -8,6 +8,7 @@ import * as THREE from "three";
 import type { MissionResult } from "./store";
 import { sphereBoxPenetration } from "./collision";
 import RyuouModel from "./RyuouModel";
+import CorbackModel from "./CorbackModel";
 import SonarSurfaceMaterial, { SONAR_RANGE, SONAR_SPEED, SONAR_TRAVEL_TIME, type SonarPulse } from "./SonarSurfaceMaterial";
 
 type EnemyKind = "scout" | "hunter" | "layer" | "boss";
@@ -304,111 +305,8 @@ function createExplosionPool(count: number): ExplosionState[] {
   }));
 }
 
-function MantaX1Model() {
-  const accent = "#ffd36a";
-  return (
-    <group scale={0.88}>
-      {[-2.65, 2.65].map((x) => (
-        <group key={x} position={[x, 0, -0.15]}>
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <capsuleGeometry args={[1.25, 7.8, 8, 18]} />
-            <meshStandardMaterial
-              color="#526568"
-              emissive="#283638"
-              emissiveIntensity={0.18}
-              metalness={0.84}
-              roughness={0.3}
-            />
-          </mesh>
-          <mesh position={[0, 0, 4.9]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[1.05, 1.25, 1.3, 18]} />
-            <meshStandardMaterial color="#28383a" metalness={0.88} roughness={0.26} />
-          </mesh>
-          <mesh position={[0, 0, 5.65]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[0.75, 0.15, 8, 22]} />
-            <meshBasicMaterial color={accent} toneMapped={false} />
-          </mesh>
-          <pointLight position={[0, 0, 5.6]} color={accent} intensity={2.8} distance={20} />
-          <mesh position={[0, 1.45, 3.7]} rotation={[-0.2, 0, 0]} scale={[0.16, 1.6, 1.3]}>
-            <boxGeometry />
-            <meshStandardMaterial color="#394b4d" metalness={0.74} roughness={0.4} />
-          </mesh>
-        </group>
-      ))}
-
-      <mesh position={[0, 0.25, -1.3]} scale={[2.1, 1.2, 3.7]}>
-        <sphereGeometry args={[1, 24, 14]} />
-        <meshStandardMaterial
-          color="#40575b"
-          emissive="#243638"
-          emissiveIntensity={0.16}
-          metalness={0.8}
-          roughness={0.32}
-        />
-      </mesh>
-
-      <mesh position={[0, 1.35, -1.7]} scale={[1.25, 0.68, 2.15]}>
-        <sphereGeometry args={[1, 20, 12]} />
-        <meshPhysicalMaterial
-          color="#111d20"
-          emissive="#564416"
-          emissiveIntensity={0.25}
-          metalness={0.68}
-          roughness={0.2}
-          clearcoat={0.9}
-        />
-      </mesh>
-
-      <mesh position={[0, -0.05, 0.4]} scale={[6.8, 0.28, 1.65]}>
-        <boxGeometry />
-        <meshStandardMaterial color="#34494d" metalness={0.8} roughness={0.36} />
-      </mesh>
-
-      {[-1, 1].map((side) => (
-        <mesh
-          key={side}
-          position={[side * 4.65, 0.05, 1.2]}
-          rotation={[0, side * -0.18, side * 0.06]}
-          scale={[2.2, 0.22, 1.05]}
-        >
-          <boxGeometry />
-          <meshStandardMaterial color="#617174" metalness={0.78} roughness={0.34} />
-        </mesh>
-      ))}
-
-      <mesh position={[0, -0.35, 2.7]} scale={[1.3, 0.5, 2.2]}>
-        <sphereGeometry args={[1, 16, 10]} />
-        <meshStandardMaterial color="#283b3e" metalness={0.82} roughness={0.35} />
-      </mesh>
-
-      {[-2.65, 2.65].map((x) => (
-        <mesh key={x} position={[x, 0.05, -4.75]}>
-          <sphereGeometry args={[0.3, 10, 8]} />
-          <meshBasicMaterial color={accent} toneMapped={false} />
-          <pointLight color={accent} intensity={3} distance={24} />
-        </mesh>
-      ))}
-
-      <mesh position={[0, 0.65, -4.45]} scale={[1.05, 0.14, 0.75]}>
-        <boxGeometry />
-        <meshBasicMaterial color="#fff0ac" toneMapped={false} />
-      </mesh>
-
-      <spotLight
-        position={[0, 0, -5.3]}
-        target-position={[0, 0, -30]}
-        color="#fff4bd"
-        intensity={16}
-        angle={0.32}
-        penumbra={0.7}
-        distance={90}
-      />
-    </group>
-  );
-}
-
 function PlayerSubmarine({ variant }: { variant: string }) {
-  return variant === "manta-x1" ? <MantaX1Model /> : <RyuouModel />;
+  return variant === "corback" ? <CorbackModel /> : <RyuouModel />;
 }
 
 function EnemySubmarine({ kind, pulse }: { kind: EnemyKind; pulse: SonarPulse }) {
@@ -577,8 +475,8 @@ const GameScene = memo(function GameScene({
   const playerVelocity = useRef(new THREE.Vector3());
   const yaw = useRef(0);
   const pitch = useRef(0);
-  const playerHp = useRef(vehicle === "manta-x1" ? 150 : 100);
-  const maxHp = vehicle === "manta-x1" ? 150 : 100;
+  const playerHp = useRef(vehicle === "corback" ? 150 : 100);
+  const maxHp = vehicle === "corback" ? 150 : 100;
   const weapon = useRef<WeaponKind>("guided");
   const weaponCooldown = useRef(0);
   const sonarCooldown = useRef(0);
@@ -924,7 +822,7 @@ const GameScene = memo(function GameScene({
       const forward = workA.set(0, 0, -1).applyQuaternion(playerMesh.current.quaternion);
       const right = workB.set(1, 0, 0).applyQuaternion(playerMesh.current.quaternion);
       const boosting = controls.keys.has("ShiftLeft") || Boolean(pad?.buttons[10]?.pressed);
-      const maxSpeed = boosting ? 25 : vehicle === "manta-x1" ? 16 : 18;
+      const maxSpeed = boosting ? 25 : vehicle === "corback" ? 16 : 18;
       const targetVelocity = scratch.targetVelocity.set(0, 0, 0)
         .addScaledVector(forward, clamp(thrust, -1, 1) * maxSpeed)
         .addScaledVector(right, clamp(strafe, -1, 1) * 7);
@@ -1043,7 +941,7 @@ const GameScene = memo(function GameScene({
 
       if (!discovered.current && playerPosition.current.distanceToSquared(DISCOVERY_POSITION) < 22 * 22) {
         discovered.current = true;
-        setDialogue("discovery", "NIX「放棄機体MANTA X-1。帰還できれば、君のものだ」");
+        setDialogue("discovery", "NIX「放棄機体コーバック号。帰還できれば、君のものだ」");
       }
     }
 
@@ -1562,10 +1460,9 @@ const GameScene = memo(function GameScene({
           <torusGeometry args={[5, 0.12, 8, 32]} />
           <meshBasicMaterial color="#ffd36a" toneMapped={false} />
         </mesh>
-        <mesh scale={[2.5, 0.7, 5]} rotation={[0, 0.2, 0]}>
-          <sphereGeometry args={[1, 14, 8]} />
-          <SonarSurfaceMaterial pulse={sonarPulse} color="#5d6865" metalness={0.7} />
-        </mesh>
+        <group scale={0.75} rotation={[0, 0.2, 0]}>
+          <CorbackModel active={false} />
+        </group>
       </group>
     </>
   );
@@ -1644,7 +1541,7 @@ function Hud({ hud }: { hud: HudState }) {
 
       <div className="hud-status">
         {hud.checkpoint && <span>◆ RECORD POINT</span>}
-        {hud.discovered && <span>◆ MANTA X-1 FOUND</span>}
+        {hud.discovered && <span>◆ CORBACK II FOUND</span>}
       </div>
 
       {hud.respawning && (
@@ -1698,7 +1595,7 @@ export default function UnderwaterGame({
   onExit: () => void;
   onComplete: (result: MissionResult) => void;
 }) {
-  const [hud, setHud] = useState<HudState>({ ...initialHud, maxHp: vehicle === "manta-x1" ? 150 : 100 });
+  const [hud, setHud] = useState<HudState>({ ...initialHud, maxHp: vehicle === "corback" ? 150 : 100 });
   const [paused, setPaused] = useState(false);
   const togglePause = useCallback(() => setPaused((value) => !value), []);
 

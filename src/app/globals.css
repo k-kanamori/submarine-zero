@@ -453,15 +453,23 @@ dd {
   box-shadow: inset 3px 0 var(--cyan);
 }
 
-.vehicle-select .ryuou-option {
-  background-image: url("/images/ryuou-preview.png");
+.vehicle-select .ryuou-option,
+.vehicle-select .corback-option {
   background-repeat: no-repeat;
   background-position: right center;
   background-size: auto 100%;
   padding-right: 6rem;
 }
 
-.ryuou-option small {
+.vehicle-select .ryuou-option {
+  background-image: url("/images/ryuou-preview.png");
+}
+
+.vehicle-select .corback-option {
+  background-image: url("/images/corback-preview.png");
+}
+
+.vehicle-select small {
   display: block;
   color: var(--muted);
   font: 600 0.7rem "Rajdhani", sans-serif;
