@@ -30,8 +30,8 @@ export const useGameStore = create<GameStore>()(
   persist(
     (set) => ({
       screen: "title",
-      selectedVehicle: "zero-skiff",
-      unlockedVehicles: ["zero-skiff"],
+      selectedVehicle: "ryuou",
+      unlockedVehicles: ["ryuou"],
       bestScore: 0,
       lastResult: null,
       showControls: false,
@@ -49,14 +49,27 @@ export const useGameStore = create<GameStore>()(
         })),
       resetProgress: () =>
         set({
-          selectedVehicle: "zero-skiff",
-          unlockedVehicles: ["zero-skiff"],
+          selectedVehicle: "ryuou",
+          unlockedVehicles: ["ryuou"],
           bestScore: 0,
           lastResult: null,
         }),
     }),
     {
       name: "deep-zero-save-v1",
+      version: 1,
+      migrate: (persisted) => {
+        const saved = persisted as Partial<GameStore> | undefined;
+        return {
+          bestScore: saved?.bestScore ?? 0,
+          // Introduce the new player craft once, preserving scores and unlocks.
+          selectedVehicle: "ryuou",
+          unlockedVehicles: Array.from(new Set([
+            "ryuou",
+            ...(saved?.unlockedVehicles ?? []).filter((id) => id !== "zero-skiff"),
+          ])),
+        };
+      },
       partialize: (state) => ({
         selectedVehicle: state.selectedVehicle,
         unlockedVehicles: state.unlockedVehicles,

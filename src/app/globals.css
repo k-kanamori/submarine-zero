@@ -453,6 +453,27 @@ dd {
   box-shadow: inset 3px 0 var(--cyan);
 }
 
+.vehicle-select .ryuou-option {
+  background-image: url("/images/ryuou-preview.png");
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: auto 100%;
+  padding-right: 6rem;
+}
+
+.ryuou-option small {
+  display: block;
+  color: var(--muted);
+  font: 600 0.7rem "Rajdhani", sans-serif;
+  letter-spacing: 0.14em;
+}
+
+.game-model-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+}
+
 .vehicle-select span {
   margin-top: 0.35rem;
   color: var(--muted);

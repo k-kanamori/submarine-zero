@@ -110,10 +110,10 @@ export default function GameShell() {
               <h3>選択中の機体</h3>
               <div className="vehicle-select">
                 <button
-                  className={store.selectedVehicle === "zero-skiff" ? "selected" : ""}
-                  onClick={() => store.selectVehicle("zero-skiff")}
+                  className={"ryuou-option " + (store.selectedVehicle === "ryuou" ? "selected" : "")}
+                  onClick={() => store.selectVehicle("ryuou")}
                 >
-                  <strong>ZERO SKIFF</strong>
+                  <strong>りゅうおう <small>RYUOU</small></strong>
                   <span>機動性 A / 耐久 C</span>
                 </button>
                 <button

@@ -3,9 +3,11 @@
 /* eslint-disable react-hooks/immutability, react-hooks/refs */
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { MissionResult } from "./store";
+import { sphereBoxPenetration } from "./collision";
+import RyuouModel from "./RyuouModel";
 
 type EnemyKind = "scout" | "hunter" | "layer" | "boss";
 type WeaponKind = "guided" | "manual";
@@ -132,6 +134,11 @@ const clamp = THREE.MathUtils.clamp;
 const PLAYER_COLLISION_RADIUS = 5.2;
 const SEA_FLOOR_Y = -219;
 const ICE_CEILING_Y = 5;
+const DISCOVERY_POSITION = new THREE.Vector3(72, -106, -432);
+
+// These slots stay in the scene even when idle (intensity 0). Changing the
+// number of lights on each shot/explosion forces new shader variants to compile.
+const EFFECT_LIGHT_COUNT = 2;
 
 const ICE_FORMATIONS: IceFormation[] = Array.from({ length: 54 }, (_, index) => {
   const row = Math.floor(index / 6);
@@ -290,145 +297,6 @@ function createExplosionPool(count: number): ExplosionState[] {
   }));
 }
 
-function ZeroSkiffModel() {
-  const bodyColor = "#28536a";
-  const wingColor = "#1d455b";
-  const accent = "#75f0df";
-  const wingShape = useMemo(() => {
-    const shape = new THREE.Shape();
-    shape.moveTo(0, -6.1);
-    shape.bezierCurveTo(-1.7, -5.7, -2.8, -3.6, -3.9, -2.2);
-    shape.bezierCurveTo(-5.3, -0.6, -7.1, 0.1, -7.8, 1.3);
-    shape.bezierCurveTo(-7, 2.5, -4.6, 3.1, -2.3, 2.5);
-    shape.lineTo(-1.45, 5.5);
-    shape.bezierCurveTo(-0.9, 5, -0.45, 4.4, 0, 3.8);
-    shape.bezierCurveTo(0.45, 4.4, 0.9, 5, 1.45, 5.5);
-    shape.lineTo(2.4, 2.5);
-    shape.bezierCurveTo(4.6, 3.1, 7, 2.5, 7.8, 1.3);
-    shape.bezierCurveTo(7.1, 0.1, 5.3, -0.6, 3.9, -2.2);
-    shape.bezierCurveTo(2.8, -3.6, 1.7, -5.7, 0, -6.1);
-    shape.closePath();
-    return shape;
-  }, []);
-
-  return (
-    <group scale={0.82}>
-      <mesh position={[0, 0.28, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <extrudeGeometry
-          args={[
-            wingShape,
-            {
-              depth: 0.5,
-              bevelEnabled: true,
-              bevelSize: 0.25,
-              bevelThickness: 0.18,
-              bevelSegments: 2,
-            },
-          ]}
-        />
-        <meshStandardMaterial
-          color={wingColor}
-          emissive="#0b2f42"
-          emissiveIntensity={0.12}
-          roughness={0.42}
-          metalness={0.72}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      <mesh position={[0, 0.3, -0.8]} scale={[2.75, 1.35, 5.8]}>
-        <sphereGeometry args={[1, 28, 16]} />
-        <meshStandardMaterial
-          color={bodyColor}
-          emissive="#0b3144"
-          emissiveIntensity={0.16}
-          roughness={0.32}
-          metalness={0.78}
-        />
-      </mesh>
-
-      <mesh position={[0, -0.55, -1.1]} scale={[3.15, 0.78, 4.8]}>
-        <sphereGeometry args={[1, 24, 12]} />
-        <meshStandardMaterial color="#173846" roughness={0.5} metalness={0.64} />
-      </mesh>
-
-      <mesh position={[0, 1.35, -1.55]} scale={[1.45, 0.72, 2.35]}>
-        <sphereGeometry args={[1, 20, 12]} />
-        <meshPhysicalMaterial
-          color="#071b28"
-          emissive="#0b4b5e"
-          emissiveIntensity={0.28}
-          roughness={0.18}
-          metalness={0.72}
-          clearcoat={0.8}
-        />
-      </mesh>
-
-      <mesh position={[0, 1.05, 1.75]} scale={[0.58, 1.3, 2.4]}>
-        <sphereGeometry args={[1, 16, 10]} />
-        <meshStandardMaterial color="#173a4b" roughness={0.38} metalness={0.75} />
-      </mesh>
-
-      <mesh position={[0, 1.62, 3.65]} rotation={[0.12, 0, 0]} scale={[0.18, 1.7, 1.5]}>
-        <boxGeometry />
-        <meshStandardMaterial color="#173a4b" metalness={0.72} roughness={0.44} />
-      </mesh>
-
-      {[-2.15, 2.15].map((x) => (
-        <group key={x} position={[x, -0.05, 3.45]}>
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[0.72, 0.92, 2.9, 18]} />
-            <meshStandardMaterial color="#183744" metalness={0.84} roughness={0.3} />
-          </mesh>
-          <mesh position={[0, 0, 1.5]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[0.58, 0.12, 8, 20]} />
-            <meshBasicMaterial color={accent} toneMapped={false} />
-          </mesh>
-          <pointLight position={[0, 0, 1.5]} color={accent} intensity={2.4} distance={18} />
-        </group>
-      ))}
-
-      <mesh position={[-1.65, 0.05, -4.65]}>
-        <sphereGeometry args={[0.28, 10, 8]} />
-        <meshBasicMaterial color={accent} toneMapped={false} />
-        <pointLight color={accent} intensity={3} distance={24} />
-      </mesh>
-      <mesh position={[1.65, 0.05, -4.65]}>
-        <sphereGeometry args={[0.28, 10, 8]} />
-        <meshBasicMaterial color={accent} toneMapped={false} />
-        <pointLight color={accent} intensity={3} distance={24} />
-      </mesh>
-
-      {[-1, 1].map((side) => (
-        <mesh
-          key={side}
-          position={[side * 3.4, 0.32, 1.65]}
-          rotation={[0, side * -0.12, side * 0.08]}
-          scale={[2.8, 0.16, 0.55]}
-        >
-          <boxGeometry />
-          <meshStandardMaterial color="#386f83" metalness={0.7} roughness={0.35} />
-        </mesh>
-      ))}
-
-      <mesh position={[0, 0.48, -4.7]} scale={[0.85, 0.12, 0.9]}>
-        <boxGeometry />
-        <meshBasicMaterial color="#d6f5f2" toneMapped={false} />
-      </mesh>
-
-      <spotLight
-        position={[0, 0, -5.2]}
-        target-position={[0, 0, -30]}
-        color="#b8fff5"
-        intensity={14}
-        angle={0.3}
-        penumbra={0.75}
-        distance={85}
-      />
-    </group>
-  );
-}
-
 function MantaX1Model() {
   const accent = "#ffd36a";
   return (
@@ -533,7 +401,7 @@ function MantaX1Model() {
 }
 
 function PlayerSubmarine({ variant }: { variant: string }) {
-  return variant === "manta-x1" ? <MantaX1Model /> : <ZeroSkiffModel />;
+  return variant === "manta-x1" ? <MantaX1Model /> : <RyuouModel />;
 }
 
 function EnemySubmarine({ kind }: { kind: EnemyKind }) {
@@ -558,7 +426,6 @@ function EnemySubmarine({ kind }: { kind: EnemyKind }) {
             <mesh key={index} position={[Math.cos(angle) * 25, 0, Math.sin(angle) * 25]}>
               <sphereGeometry args={[0.7, 10, 8]} />
               <meshBasicMaterial color="#ff473d" toneMapped={false} />
-              <pointLight color="#ff3d34" intensity={4} distance={18} />
             </mesh>
           );
         })}
@@ -580,7 +447,6 @@ function EnemySubmarine({ kind }: { kind: EnemyKind }) {
       <mesh position={[0, 0.3, -3]}>
         <sphereGeometry args={[0.32, 8, 6]} />
         <meshBasicMaterial color="#ff493f" toneMapped={false} />
-        <pointLight color="#ff493f" intensity={2} distance={13} />
       </mesh>
     </>
   );
@@ -596,9 +462,34 @@ function TorpedoModel({ friendly }: { friendly: boolean }) {
       <mesh position={[0, 0, 1]}>
         <sphereGeometry args={[0.2, 8, 6]} />
         <meshBasicMaterial color={friendly ? "#69ffee" : "#ff493f"} toneMapped={false} />
-        <pointLight color={friendly ? "#69ffee" : "#ff493f"} intensity={2} distance={10} />
       </mesh>
     </>
+  );
+}
+
+function IceFormations() {
+  const mesh = useRef<THREE.InstancedMesh>(null);
+  useLayoutEffect(() => {
+    if (!mesh.current) return;
+    const transform = new THREE.Object3D();
+    const color = new THREE.Color();
+    ICE_FORMATIONS.forEach((formation, index) => {
+      transform.position.set(...formation.position);
+      transform.scale.set(...formation.scale);
+      transform.rotation.set(...formation.rotation);
+      transform.updateMatrix();
+      mesh.current!.setMatrixAt(index, transform.matrix);
+      mesh.current!.setColorAt(index, color.set(index % 3 === 0 ? "#183d43" : "#123038"));
+    });
+    mesh.current.instanceMatrix.needsUpdate = true;
+    if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
+    mesh.current.computeBoundingSphere();
+  }, []);
+  return (
+    <instancedMesh ref={mesh} args={[undefined, undefined, ICE_FORMATIONS.length]}>
+      <dodecahedronGeometry args={[1, 0]} />
+      <meshStandardMaterial roughness={0.88} />
+    </instancedMesh>
   );
 }
 
@@ -627,12 +518,7 @@ function IceEnvironment() {
         <boxGeometry />
         <meshStandardMaterial color="#061416" roughness={1} />
       </mesh>
-      {ICE_FORMATIONS.map((item, index) => (
-        <mesh key={index} position={item.position} scale={item.scale} rotation={item.rotation}>
-          <dodecahedronGeometry args={[1, 0]} />
-          <meshStandardMaterial color={index % 3 === 0 ? "#183d43" : "#123038"} roughness={0.88} />
-        </mesh>
-      ))}
+      <IceFormations />
       <group position={[0, -112, -420]}>
         {[-42, -14, 14, 42].map((x) => (
           <mesh key={x} position={[x, 0, 0]} scale={[4, 55, 4]}>
@@ -655,19 +541,21 @@ function IceEnvironment() {
   );
 }
 
-function GameScene({
-  vehicle,
-  paused,
-  onPause,
-  onHud,
-  onComplete,
-}: {
+type GameSceneProps = {
   vehicle: string;
   paused: boolean;
   onPause: () => void;
   onHud: (hud: HudState) => void;
   onComplete: (result: MissionResult) => void;
-}) {
+};
+
+const GameScene = memo(function GameScene({
+  vehicle,
+  paused,
+  onPause,
+  onHud,
+  onComplete,
+}: GameSceneProps) {
   const { camera, gl, scene } = useThree();
   const input = useRef<InputState>({
     keys: new Set(),
@@ -689,11 +577,11 @@ function GameScene({
   const sonarCooldown = useRef(0);
   const sonarAge = useRef(99);
   const lockId = useRef<string | null>(null);
-  const enemies = useRef(createEnemies());
-  const projectiles = useRef(createProjectilePool(72));
-  const mines = useRef(createTimedPool(10));
-  const decoys = useRef(createTimedPool(6));
-  const explosions = useRef(createExplosionPool(18));
+  const enemies = useMemo(() => createEnemies(), []);
+  const projectiles = useMemo(() => createProjectilePool(72), []);
+  const mines = useMemo(() => createTimedPool(10), []);
+  const decoys = useMemo(() => createTimedPool(6), []);
+  const explosions = useMemo(() => createExplosionPool(18), []);
   const sonarMesh = useRef<THREE.Mesh>(null);
   const discoveryMesh = useRef<THREE.Group>(null);
   const elapsed = useRef(0);
@@ -712,6 +600,20 @@ function GameScene({
   const workA = useMemo(() => new THREE.Vector3(), []);
   const workB = useMemo(() => new THREE.Vector3(), []);
   const workQ = useMemo(() => new THREE.Quaternion(), []);
+  const scratch = useMemo(() => ({
+    euler: new THREE.Euler(0, 0, 0, "YXZ"),
+    targetVelocity: new THREE.Vector3(),
+    contactNormal: new THREE.Vector3(),
+    collisionNormal: new THREE.Vector3(),
+    cameraBack: new THREE.Vector3(),
+    desiredCamera: new THREE.Vector3(),
+    toPlayer: new THREE.Vector3(),
+    moveDirection: new THREE.Vector3(),
+    orbit: new THREE.Vector3(),
+    desired: new THREE.Vector3(),
+    lookAt: new THREE.Vector3(),
+  }), []);
+  const effectLights = useRef<(THREE.PointLight | null)[]>([]);
 
   const setDialogue = useCallback((id: string, text: string) => {
     if (dialogueFlags.current.has(id)) return;
@@ -721,31 +623,46 @@ function GameScene({
 
   useEffect(() => {
     const state = input.current;
+    if (paused) {
+      state.keys.clear();
+      state.pressed.clear();
+      state.mouseX = state.mouseY = 0;
+      if (document.pointerLockElement === gl.domElement) document.exitPointerLock();
+    }
     const press = (code: string) => {
       if (!state.keys.has(code)) state.pressed.add(code);
       state.keys.add(code);
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Escape") {
+        if (!event.repeat) onPause();
+        return;
+      }
+      if (paused) return;
       press(event.code);
-      if (event.code === "Escape") onPause();
       if (["Space", "Tab", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.code)) {
         event.preventDefault();
       }
     };
     const onKeyUp = (event: KeyboardEvent) => state.keys.delete(event.code);
     const onMouseMove = (event: MouseEvent) => {
-      if (document.pointerLockElement === gl.domElement) {
+      if (!paused && document.pointerLockElement === gl.domElement) {
         state.mouseX += event.movementX;
         state.mouseY += event.movementY;
       }
     };
     const onMouseDown = (event: MouseEvent) => {
+      if (paused) return;
       synth.current.unlock();
-      if (document.pointerLockElement !== gl.domElement) void gl.domElement.requestPointerLock();
+      if (document.pointerLockElement !== gl.domElement) {
+        // Embedded browsers can decline pointer lock; keyboard steering still works.
+        void gl.domElement.requestPointerLock()?.catch(() => undefined);
+      }
       if (event.button === 0) state.pressed.add("Fire");
       if (event.button === 2) state.pressed.add("Lock");
     };
     const onWheel = (event: WheelEvent) => {
+      if (paused) return;
       state.pressed.add("CycleWeapon");
       event.preventDefault();
     };
@@ -772,14 +689,14 @@ function GameScene({
   }, [gl, onPause, paused]);
 
   const spawnExplosion = useCallback((position: THREE.Vector3, size: number, color = "#ff9c55") => {
-    const effect = explosions.current.find((item) => !item.active);
+    const effect = explosions.find((item) => !item.active);
     if (!effect) return;
     effect.active = true;
     effect.position.copy(position);
     effect.ttl = 1;
     effect.size = size;
     effect.color = color;
-  }, []);
+  }, [explosions]);
 
   const spawnProjectile = useCallback(
     (
@@ -791,7 +708,7 @@ function GameScene({
       damage: number,
       speed: number,
     ) => {
-      const projectile = projectiles.current.find((item) => !item.active);
+      const projectile = projectiles.find((item) => !item.active);
       if (!projectile) return false;
       projectile.active = true;
       projectile.friendly = friendly;
@@ -804,9 +721,15 @@ function GameScene({
       projectile.falling = false;
       projectile.sinkTime = 0;
       projectile.damage = damage;
+      if (projectile.mesh) {
+        const body = projectile.mesh.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+        const glow = projectile.mesh.children[1] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+        body.material.color.set(friendly ? "#b8e1d9" : "#d67b6f");
+        glow.material.color.set(friendly ? "#69ffee" : "#ff493f");
+      }
       return true;
     },
-    [],
+    [projectiles],
   );
 
   const triggerSonar = useCallback(() => {
@@ -814,7 +737,7 @@ function GameScene({
     sonarCooldown.current = 6;
     sonarAge.current = 0;
     synth.current.sonar();
-    enemies.current.forEach((enemy) => {
+    enemies.forEach((enemy) => {
       const distance = enemy.position.distanceTo(playerPosition.current);
       if (enemy.alive && enemy.spawned && distance < 650) {
         enemy.detectedUntil = elapsed.current + 5.5;
@@ -822,10 +745,10 @@ function GameScene({
       }
     });
     setDialogue("first-sonar", "NIX「こちらの音も丸聞こえだ。さあ、何が返事をするかな」");
-  }, [setDialogue]);
+  }, [enemies, setDialogue]);
 
   const selectLock = useCallback(() => {
-    const candidates = enemies.current
+    const candidates = enemies
       .filter(
         (enemy) =>
           enemy.alive &&
@@ -838,7 +761,7 @@ function GameScene({
       );
     lockId.current = candidates[0]?.id ?? null;
     if (!lockId.current) setDialogue("no-contact", "NIX「ロックするには、まず見つけることだね」");
-  }, [setDialogue]);
+  }, [enemies, setDialogue]);
 
   const firePlayerWeapon = useCallback(() => {
     if (weaponCooldown.current > 0 || respawnTimer.current > 0 || !playerMesh.current) return;
@@ -866,22 +789,22 @@ function GameScene({
   }, [setDialogue, spawnProjectile]);
 
   const deployMine = useCallback(() => {
-    const mine = mines.current.find((item) => !item.active);
+    const mine = mines.find((item) => !item.active);
     if (!mine || !playerMesh.current) return;
     const back = new THREE.Vector3(0, 0, 1).applyQuaternion(playerMesh.current.quaternion);
     mine.active = true;
     mine.ttl = 25;
     mine.position.copy(playerPosition.current).addScaledVector(back, 7);
-  }, []);
+  }, [mines]);
 
   const deployDecoy = useCallback(() => {
-    const decoy = decoys.current.find((item) => !item.active);
+    const decoy = decoys.find((item) => !item.active);
     if (!decoy) return;
     decoy.active = true;
     decoy.ttl = 6;
     decoy.position.copy(playerPosition.current);
     synth.current.tone(320, 0.25, 0.06, "square");
-  }, []);
+  }, [decoys]);
 
   const respawn = useCallback(() => {
     playerHp.current = maxHp;
@@ -889,7 +812,7 @@ function GameScene({
     playerPosition.current.set(0, checkpoint.current ? -105 : -25, checkpoint.current ? -395 : 40);
     yaw.current = 0;
     pitch.current = 0;
-    projectiles.current.forEach((projectile) => {
+    projectiles.forEach((projectile) => {
       projectile.active = false;
     });
     lockId.current = null;
@@ -897,7 +820,7 @@ function GameScene({
     setDialogue("respawn-" + elapsed.current, checkpoint.current
       ? "NIX「観測施設の記録点から再開。今度は沈まないでくれ」"
       : "NIX「予備機へ意識を戻した。君は相変わらず乱暴だ」");
-  }, [maxHp, setDialogue]);
+  }, [maxHp, projectiles, setDialogue]);
 
   useFrame((state, frameDelta) => {
     const dt = Math.min(frameDelta, 0.05);
@@ -984,109 +907,80 @@ function GameScene({
       controls.mouseX = 0;
       controls.mouseY = 0;
 
-      workQ.setFromEuler(new THREE.Euler(pitch.current, yaw.current, 0, "YXZ"));
+      workQ.setFromEuler(scratch.euler.set(pitch.current, yaw.current, 0));
       playerMesh.current.quaternion.slerp(workQ, 1 - Math.exp(-dt * 8));
       const forward = workA.set(0, 0, -1).applyQuaternion(playerMesh.current.quaternion);
       const right = workB.set(1, 0, 0).applyQuaternion(playerMesh.current.quaternion);
       const boosting = controls.keys.has("ShiftLeft") || Boolean(pad?.buttons[10]?.pressed);
       const maxSpeed = boosting ? 25 : vehicle === "manta-x1" ? 16 : 18;
-      const targetVelocity = new THREE.Vector3()
+      const targetVelocity = scratch.targetVelocity.set(0, 0, 0)
         .addScaledVector(forward, clamp(thrust, -1, 1) * maxSpeed)
-        .addScaledVector(right, clamp(strafe, -1, 1) * 7)
-        .addScaledVector(new THREE.Vector3(0, 1, 0), clamp(vertical, -1, 1) * 9);
+        .addScaledVector(right, clamp(strafe, -1, 1) * 7);
+      targetVelocity.y += clamp(vertical, -1, 1) * 9;
       const response = 1 - Math.exp(-dt * (thrust === 0 && strafe === 0 && vertical === 0 ? 2.2 : 1.35));
       playerVelocity.current.lerp(targetVelocity, response);
       playerPosition.current.addScaledVector(playerVelocity.current, dt);
 
-      let collisionNormal: THREE.Vector3 | null = null;
+      const collisionNormal = scratch.collisionNormal;
       let collisionDepth = 0;
       const registerCollision = (normal: THREE.Vector3, penetration: number) => {
         if (penetration > collisionDepth) {
           collisionDepth = penetration;
-          collisionNormal = normal;
+          collisionNormal.copy(normal);
         }
       };
 
       if (playerPosition.current.x - PLAYER_COLLISION_RADIUS < -155) {
         registerCollision(
-          new THREE.Vector3(1, 0, 0),
+          scratch.contactNormal.set(1, 0, 0),
           -155 - (playerPosition.current.x - PLAYER_COLLISION_RADIUS),
         );
       }
       if (playerPosition.current.x + PLAYER_COLLISION_RADIUS > 155) {
         registerCollision(
-          new THREE.Vector3(-1, 0, 0),
+          scratch.contactNormal.set(-1, 0, 0),
           playerPosition.current.x + PLAYER_COLLISION_RADIUS - 155,
         );
       }
       if (playerPosition.current.y + PLAYER_COLLISION_RADIUS > ICE_CEILING_Y) {
         registerCollision(
-          new THREE.Vector3(0, -1, 0),
+          scratch.contactNormal.set(0, -1, 0),
           playerPosition.current.y + PLAYER_COLLISION_RADIUS - ICE_CEILING_Y,
         );
       }
       if (playerPosition.current.y - PLAYER_COLLISION_RADIUS < SEA_FLOOR_Y) {
         registerCollision(
-          new THREE.Vector3(0, 1, 0),
+          scratch.contactNormal.set(0, 1, 0),
           SEA_FLOOR_Y - (playerPosition.current.y - PLAYER_COLLISION_RADIUS),
         );
       }
       if (playerPosition.current.z - PLAYER_COLLISION_RADIUS < -900) {
         registerCollision(
-          new THREE.Vector3(0, 0, 1),
+          scratch.contactNormal.set(0, 0, 1),
           -900 - (playerPosition.current.z - PLAYER_COLLISION_RADIUS),
         );
       }
       if (playerPosition.current.z + PLAYER_COLLISION_RADIUS > 80) {
         registerCollision(
-          new THREE.Vector3(0, 0, -1),
+          scratch.contactNormal.set(0, 0, -1),
           playerPosition.current.z + PLAYER_COLLISION_RADIUS - 80,
         );
       }
 
-      TERRAIN_COLLIDERS.forEach((collider) => {
-        const closest = new THREE.Vector3(
-          clamp(
-            playerPosition.current.x,
-            collider.center.x - collider.halfSize.x,
-            collider.center.x + collider.halfSize.x,
-          ),
-          clamp(
-            playerPosition.current.y,
-            collider.center.y - collider.halfSize.y,
-            collider.center.y + collider.halfSize.y,
-          ),
-          clamp(
-            playerPosition.current.z,
-            collider.center.z - collider.halfSize.z,
-            collider.center.z + collider.halfSize.z,
-          ),
+      for (const collider of TERRAIN_COLLIDERS) {
+        const penetration = sphereBoxPenetration(
+          playerPosition.current, PLAYER_COLLISION_RADIUS,
+          collider.center, collider.halfSize, scratch.contactNormal,
         );
-        const separation = playerPosition.current.clone().sub(closest);
-        const distanceSquared = separation.lengthSq();
-        if (distanceSquared >= PLAYER_COLLISION_RADIUS * PLAYER_COLLISION_RADIUS) return;
+        registerCollision(scratch.contactNormal, penetration);
+      }
 
-        if (distanceSquared > 0.0001) {
-          const distance = Math.sqrt(distanceSquared);
-          registerCollision(separation.multiplyScalar(1 / distance), PLAYER_COLLISION_RADIUS - distance);
-          return;
-        }
-
-        const local = playerPosition.current.clone().sub(collider.center);
-        const faceDistances = [
-          { depth: collider.halfSize.x - Math.abs(local.x), normal: new THREE.Vector3(Math.sign(local.x) || 1, 0, 0) },
-          { depth: collider.halfSize.y - Math.abs(local.y), normal: new THREE.Vector3(0, Math.sign(local.y) || 1, 0) },
-          { depth: collider.halfSize.z - Math.abs(local.z), normal: new THREE.Vector3(0, 0, Math.sign(local.z) || 1) },
-        ].sort((a, b) => a.depth - b.depth);
-        registerCollision(faceDistances[0].normal, PLAYER_COLLISION_RADIUS + faceDistances[0].depth);
-      });
-
-      if (collisionNormal) {
-        const normal = collisionNormal as THREE.Vector3;
+      if (collisionDepth > 0) {
+        const normal = collisionNormal;
         const impactSpeed = Math.max(0, -playerVelocity.current.dot(normal));
         playerPosition.current.addScaledVector(normal, collisionDepth + 0.06);
 
-        const reflectedVelocity = playerVelocity.current.clone().reflect(normal).multiplyScalar(0.34);
+        const reflectedVelocity = scratch.desired.copy(playerVelocity.current).reflect(normal).multiplyScalar(0.34);
         playerVelocity.current.lerp(reflectedVelocity, 0.84);
         const reboundSpeed = playerVelocity.current.length();
         if (reboundSpeed > 0.2) {
@@ -1116,11 +1010,11 @@ function GameScene({
 
       playerMesh.current.position.copy(playerPosition.current);
 
-      const cameraBack = new THREE.Vector3(0, 6.5, 22).applyQuaternion(playerMesh.current.quaternion);
-      const desiredCamera = playerPosition.current.clone().add(cameraBack);
+      const cameraBack = scratch.cameraBack.set(0, 6.5, 22).applyQuaternion(playerMesh.current.quaternion);
+      const desiredCamera = scratch.desiredCamera.copy(playerPosition.current).add(cameraBack);
       camera.position.lerp(desiredCamera, 1 - Math.exp(-dt * 4.4));
       cameraTarget.current.lerp(
-        playerPosition.current.clone().addScaledVector(forward, 12),
+        scratch.lookAt.copy(playerPosition.current).addScaledVector(forward, 12),
         1 - Math.exp(-dt * 7),
       );
       camera.lookAt(cameraTarget.current);
@@ -1135,17 +1029,16 @@ function GameScene({
         setDialogue("checkpoint", "NIX「観測施設を記録点に設定。次に沈んでも、ここまでは戻れる」");
       }
 
-      const discoveryPosition = new THREE.Vector3(72, -106, -432);
-      if (!discovered.current && playerPosition.current.distanceTo(discoveryPosition) < 22) {
+      if (!discovered.current && playerPosition.current.distanceToSquared(DISCOVERY_POSITION) < 22 * 22) {
         discovered.current = true;
         setDialogue("discovery", "NIX「放棄機体MANTA X-1。帰還できれば、君のものだ」");
       }
     }
 
-    const activeEscortCount = enemies.current.filter(
+    const activeEscortCount = enemies.filter(
       (enemy) => enemy.kind !== "boss" && enemy.alive && enemy.spawned,
     ).length;
-    const nextEscort = enemies.current.find(
+    const nextEscort = enemies.find(
       (enemy) =>
         enemy.kind !== "boss" &&
         enemy.alive &&
@@ -1169,7 +1062,7 @@ function GameScene({
       );
     }
 
-    const boss = enemies.current.find((enemy) => enemy.kind === "boss");
+    const boss = enemies.find((enemy) => enemy.kind === "boss");
     if (boss && boss.alive && (playerPosition.current.z < -520 || kills.current >= 8)) {
       if (!boss.alerted) {
         boss.alerted = true;
@@ -1179,7 +1072,7 @@ function GameScene({
       }
     }
 
-    enemies.current.forEach((enemy, enemyIndex) => {
+    enemies.forEach((enemy, enemyIndex) => {
       if (!enemy.mesh) return;
       enemy.mesh.visible = enemy.alive && enemy.spawned;
       if (!enemy.alive || !enemy.spawned) return;
@@ -1187,11 +1080,11 @@ function GameScene({
       if (distance < 90) enemy.detectedUntil = now + 1;
       const active = enemy.alerted || distance < 250;
       if (active && respawnTimer.current <= 0 && !completed.current) {
-        const toPlayer = playerPosition.current.clone().sub(enemy.position);
+        const toPlayer = scratch.toPlayer.copy(playerPosition.current).sub(enemy.position);
         const desiredDistance = enemy.kind === "boss" ? 135 : enemy.kind === "layer" ? 100 : 75;
-        const moveDirection = toPlayer.clone().normalize();
+        const moveDirection = scratch.moveDirection.copy(toPlayer).normalize();
         if (distance < desiredDistance) moveDirection.multiplyScalar(-0.55);
-        const orbit = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize();
+        const orbit = scratch.orbit.set(-toPlayer.z, 0, toPlayer.x).normalize();
         moveDirection.addScaledVector(orbit, enemy.kind === "boss" ? 0.28 : (enemyIndex % 2 ? 0.38 : -0.38));
         const enemySpeed = enemy.kind === "boss" ? 3.2 : enemy.kind === "scout" ? 10 : 7;
         enemy.velocity.lerp(moveDirection.normalize().multiplyScalar(enemySpeed), 1 - Math.exp(-dt * 0.9));
@@ -1201,10 +1094,10 @@ function GameScene({
         if (distance < (enemy.kind === "boss" ? 330 : 220) && enemy.fireCooldown <= 0) {
           const shotCount = enemy.kind === "boss" && enemy.hp < 360 ? 3 : 1;
           for (let shot = 0; shot < shotCount; shot += 1) {
-            const direction = toPlayer.clone().normalize();
+            const direction = scratch.desired.copy(toPlayer).normalize();
             direction.x += (shot - (shotCount - 1) / 2) * 0.11;
             spawnProjectile(
-              enemy.position.clone(),
+              enemy.position,
               direction,
               false,
               true,
@@ -1220,27 +1113,28 @@ function GameScene({
       if (enemy.kind === "boss") {
         enemy.mesh.rotation.y += dt * (enemy.hp < 210 ? 0.42 : 0.2);
       } else if (enemy.velocity.lengthSq() > 0.1) {
-        enemy.mesh.lookAt(enemy.position.clone().add(enemy.velocity));
+        enemy.mesh.lookAt(scratch.lookAt.copy(enemy.position).add(enemy.velocity));
       }
       const marker = enemy.mesh.getObjectByName("contact-marker");
       if (marker) marker.visible = enemy.detectedUntil > now;
     });
 
-    decoys.current.forEach((decoy) => {
+    decoys.forEach((decoy) => {
       if (!decoy.mesh) return;
       decoy.ttl -= decoy.active ? dt : 0;
       if (decoy.ttl <= 0) decoy.active = false;
       decoy.mesh.visible = decoy.active;
+      if (!decoy.active) return;
       decoy.mesh.position.copy(decoy.position);
       decoy.mesh.rotation.y += dt * 3;
     });
 
-    mines.current.forEach((mine) => {
+    mines.forEach((mine) => {
       if (!mine.mesh) return;
       mine.ttl -= mine.active ? dt : 0;
       if (mine.ttl <= 0) mine.active = false;
       if (mine.active) {
-        const target = enemies.current.find(
+        const target = enemies.find(
           (enemy) =>
             enemy.alive &&
             enemy.spawned &&
@@ -1254,11 +1148,12 @@ function GameScene({
         }
       }
       mine.mesh.visible = mine.active;
+      if (!mine.active) return;
       mine.mesh.position.copy(mine.position);
       mine.mesh.rotation.y += dt;
     });
 
-    projectiles.current.forEach((projectile) => {
+    projectiles.forEach((projectile) => {
       if (!projectile.mesh) return;
       if (!projectile.active) {
         projectile.mesh.visible = false;
@@ -1292,15 +1187,19 @@ function GameScene({
       let targetPosition: THREE.Vector3 | null = null;
       if (!projectile.falling && projectile.guided && projectile.targetId) {
         if (projectile.targetId === "player") {
-          const nearestDecoy = decoys.current
-            .filter((decoy) => decoy.active)
-            .sort(
-              (a, b) =>
-                a.position.distanceTo(projectile.position) - b.position.distanceTo(projectile.position),
-            )[0];
+          let nearestDecoy: TimedObject | undefined;
+          let nearestDistance = Infinity;
+          for (const decoy of decoys) {
+            if (!decoy.active) continue;
+            const distance = decoy.position.distanceToSquared(projectile.position);
+            if (distance < nearestDistance) {
+              nearestDistance = distance;
+              nearestDecoy = decoy;
+            }
+          }
           targetPosition = nearestDecoy?.position ?? playerPosition.current;
         } else {
-          const target = enemies.current.find(
+          const target = enemies.find(
             (enemy) => enemy.id === projectile.targetId && enemy.alive && enemy.spawned,
           );
           targetPosition = target?.position ?? null;
@@ -1308,7 +1207,7 @@ function GameScene({
       }
       if (targetPosition) {
         const speed = projectile.velocity.length();
-        const desired = targetPosition.clone().sub(projectile.position).normalize().multiplyScalar(speed);
+        const desired = scratch.desired.copy(targetPosition).sub(projectile.position).normalize().multiplyScalar(speed);
         projectile.velocity.lerp(desired, 1 - Math.exp(-dt * 2.4));
       }
       projectile.position.addScaledVector(projectile.velocity, dt);
@@ -1336,7 +1235,7 @@ function GameScene({
       }
 
       if (projectile.active && projectile.friendly) {
-        const target = enemies.current.find(
+        const target = enemies.find(
           (enemy) =>
             enemy.alive &&
             enemy.spawned &&
@@ -1385,19 +1284,19 @@ function GameScene({
       projectile.mesh.visible = projectile.active;
       projectile.mesh.position.copy(projectile.position);
       if (projectile.velocity.lengthSq() > 0.1) {
-        projectile.mesh.lookAt(projectile.position.clone().add(projectile.velocity));
+        projectile.mesh.lookAt(scratch.lookAt.copy(projectile.position).add(projectile.velocity));
       }
     });
 
-    for (let firstIndex = 0; firstIndex < projectiles.current.length; firstIndex += 1) {
-      const first = projectiles.current[firstIndex];
+    for (let firstIndex = 0; firstIndex < projectiles.length; firstIndex += 1) {
+      const first = projectiles[firstIndex];
       if (!first.active || first.age < 0.6) continue;
       for (
         let secondIndex = firstIndex + 1;
-        secondIndex < projectiles.current.length;
+        secondIndex < projectiles.length;
         secondIndex += 1
       ) {
-        const second = projectiles.current[secondIndex];
+        const second = projectiles[secondIndex];
         if (!second.active || second.age < 0.6) continue;
         if (first.position.distanceToSquared(second.position) > 1.7) continue;
 
@@ -1413,10 +1312,10 @@ function GameScene({
       }
     }
 
-    projectiles.current.forEach((projectile) => {
+    projectiles.forEach((projectile) => {
       if (!projectile.active || projectile.age < 0.25) return;
 
-      const hitMine = mines.current.find(
+      const hitMine = mines.find(
         (mine) => mine.active && mine.position.distanceToSquared(projectile.position) < 4,
       );
       if (hitMine) {
@@ -1429,7 +1328,7 @@ function GameScene({
         return;
       }
 
-      const hitDecoy = decoys.current.find(
+      const hitDecoy = decoys.find(
         (decoy) => decoy.active && decoy.position.distanceToSquared(projectile.position) < 6.25,
       );
       if (hitDecoy) {
@@ -1442,11 +1341,15 @@ function GameScene({
       }
     });
 
-    explosions.current.forEach((effect) => {
+    for (const light of effectLights.current) {
+      if (light) light.intensity = 0;
+    }
+    explosions.forEach((effect) => {
       if (!effect.mesh) return;
       effect.ttl -= effect.active ? dt * 0.85 : 0;
       if (effect.ttl <= 0) effect.active = false;
       effect.mesh.visible = effect.active;
+      if (!effect.active) return;
       effect.mesh.position.copy(effect.position);
       const progress = 1 - effect.ttl;
       effect.mesh.scale.setScalar(effect.size * (0.3 + progress));
@@ -1454,6 +1357,18 @@ function GameScene({
       if (material) {
         material.color.set(effect.color);
         material.opacity = Math.max(0, effect.ttl * 0.62);
+      }
+      if (effect.position.distanceToSquared(playerPosition.current) < 120 * 120) {
+        let slot: THREE.PointLight | null = null;
+        for (const light of effectLights.current) {
+          if (light && (!slot || light.intensity < slot.intensity)) slot = light;
+        }
+        const intensity = effect.ttl * 5;
+        if (slot && intensity > slot.intensity) {
+          slot.position.copy(effect.position);
+          slot.color.set(effect.color);
+          slot.intensity = intensity;
+        }
       }
     });
 
@@ -1476,7 +1391,9 @@ function GameScene({
       scene.fog.density = 0.009 + depth * 0.000055;
       scene.fog.color.set(depth > 120 ? "#010b0f" : "#062830");
     }
-    scene.background = new THREE.Color(depth > 120 ? "#01090c" : "#06242a");
+    if (scene.background instanceof THREE.Color) {
+      scene.background.set(depth > 120 ? "#01090c" : "#06242a");
+    }
 
     if (completed.current) {
       completionTimer.current -= dt;
@@ -1495,12 +1412,12 @@ function GameScene({
 
     if (now - lastHudUpdate.current > 0.08) {
       lastHudUpdate.current = now;
-      const currentBoss = enemies.current.find((enemy) => enemy.kind === "boss");
-      const locked = enemies.current.find(
+      const currentBoss = enemies.find((enemy) => enemy.kind === "boss");
+      const locked = enemies.find(
         (enemy) => enemy.id === lockId.current && enemy.alive && enemy.spawned,
       );
       if (!locked) lockId.current = null;
-      const contacts = enemies.current
+      const contacts = enemies
         .filter((enemy) => enemy.alive && enemy.spawned && enemy.detectedUntil > now)
         .map((enemy) => {
           const relative = enemy.position.clone().sub(playerPosition.current);
@@ -1545,15 +1462,24 @@ function GameScene({
   return (
     <>
       <fogExp2 attach="fog" args={["#062830", 0.011]} />
+      <color attach="background" args={["#06242a"]} />
       <ambientLight color="#6ca9a7" intensity={0.3} />
       <directionalLight position={[30, 80, 10]} color="#b7f4ee" intensity={1.25} />
       <IceEnvironment />
+      {Array.from({ length: EFFECT_LIGHT_COUNT }, (_, index) => (
+        <pointLight
+          key={index}
+          ref={(light) => { effectLights.current[index] = light; }}
+          intensity={0}
+          distance={35}
+        />
+      ))}
 
       <group ref={playerMesh} position={playerPosition.current.toArray()}>
         <PlayerSubmarine variant={vehicle} />
       </group>
 
-      {enemies.current.map((enemy) => (
+      {enemies.map((enemy) => (
         <group
           key={enemy.id}
           ref={(group) => { enemy.mesh = group; }}
@@ -1570,7 +1496,7 @@ function GameScene({
         </group>
       ))}
 
-      {projectiles.current.map((projectile) => (
+      {projectiles.map((projectile) => (
         <group
           key={projectile.id}
           ref={(group) => { projectile.mesh = group; }}
@@ -1580,33 +1506,30 @@ function GameScene({
         </group>
       ))}
 
-      {mines.current.map((mine) => (
+      {mines.map((mine) => (
         <group key={mine.id} ref={(group) => { mine.mesh = group; }} visible={false}>
           <mesh>
             <icosahedronGeometry args={[1.2, 0]} />
             <meshStandardMaterial color="#69584c" metalness={0.7} />
           </mesh>
-          <pointLight color="#ffbd61" intensity={1.2} distance={8} />
         </group>
       ))}
 
-      {decoys.current.map((decoy) => (
+      {decoys.map((decoy) => (
         <group key={decoy.id} ref={(group) => { decoy.mesh = group; }} visible={false}>
           <mesh>
             <octahedronGeometry args={[0.8, 0]} />
             <meshBasicMaterial color="#ffdf7d" toneMapped={false} />
           </mesh>
-          <pointLight color="#ffdf7d" intensity={3} distance={30} />
         </group>
       ))}
 
-      {explosions.current.map((effect) => (
+      {explosions.map((effect) => (
         <group key={effect.id} ref={(group) => { effect.mesh = group; }} visible={false}>
           <mesh>
             <sphereGeometry args={[1, 16, 12]} />
             <meshBasicMaterial color={effect.color} transparent opacity={0.5} wireframe />
           </mesh>
-          <pointLight color="#ff8d58" intensity={5} distance={35} />
         </group>
       ))}
 
@@ -1630,11 +1553,10 @@ function GameScene({
           <sphereGeometry args={[1, 14, 8]} />
           <meshStandardMaterial color="#5d6865" metalness={0.7} />
         </mesh>
-        <pointLight color="#ffd36a" intensity={2} distance={25} />
       </group>
     </>
   );
-}
+});
 
 function Hud({ hud }: { hud: HudState }) {
   const minutes = Math.floor(hud.elapsed / 60);
@@ -1722,6 +1644,38 @@ function Hud({ hud }: { hud: HudState }) {
   );
 }
 
+function SceneReady({ onReady }: { onReady: () => void }) {
+  useEffect(onReady, [onReady]);
+  return null;
+}
+
+// HUD snapshots must not rebuild Canvas options, the scene or pooled models.
+const GameViewport = memo(function GameViewport(props: GameSceneProps) {
+  const [ready, setReady] = useState(false);
+  const markReady = useCallback(() => setReady(true), []);
+  return (
+    <>
+      <Canvas
+        camera={{ position: [0, -18, 58], fov: 61, near: 0.1, far: 1300 }}
+        dpr={[0.75, 1]}
+        frameloop={props.paused ? "demand" : "always"}
+        gl={{ antialias: true, powerPreference: "high-performance" }}
+      >
+        <Suspense fallback={null}>
+          <GameScene {...props} />
+          <SceneReady onReady={markReady} />
+        </Suspense>
+      </Canvas>
+      {!ready && (
+        <div className="loading-screen game-model-loading" role="status">
+          <div className="loading-sonar" />
+          <p>潜航艇を準備中...</p>
+        </div>
+      )}
+    </>
+  );
+});
+
 export default function UnderwaterGame({
   vehicle,
   onExit,
@@ -1737,19 +1691,13 @@ export default function UnderwaterGame({
 
   return (
     <section className="game-screen">
-      <Canvas
-        camera={{ position: [0, -18, 58], fov: 61, near: 0.1, far: 1300 }}
-        dpr={[0.75, 1.5]}
-        gl={{ antialias: true, powerPreference: "high-performance" }}
-      >
-        <GameScene
-          vehicle={vehicle}
-          paused={paused}
-          onPause={togglePause}
-          onHud={setHud}
-          onComplete={onComplete}
-        />
-      </Canvas>
+      <GameViewport
+        vehicle={vehicle}
+        paused={paused}
+        onPause={togglePause}
+        onHud={setHud}
+        onComplete={onComplete}
+      />
       <Hud hud={hud} />
       <button className="pause-button" onClick={togglePause}>Ⅱ</button>
       <div className="game-tip">クリックで操艦 // Q ソナー // E ロック // 左クリック 発射</div>
