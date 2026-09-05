@@ -920,10 +920,11 @@ kbd {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 7px;
-  height: 7px;
-  border: 1px solid var(--cyan);
-  transform: translate(-50%, -50%) rotate(45deg);
+  width: 9px;
+  height: 11px;
+  background: var(--cyan);
+  clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%);
+  transform: translate(-50%, -50%);
 }
 
 .sonar-copy {

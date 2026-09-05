@@ -9,6 +9,7 @@ import type { MissionResult } from "./store";
 import { sphereBoxPenetration } from "./collision";
 import RyuouModel from "./RyuouModel";
 import CorbackModel from "./CorbackModel";
+import { steerTorpedo, tubeDirection, playerTorpedoPerformance, ENEMY_TORPEDO, BOSS_TORPEDO, TORPEDO_STRAIGHT_RUN, type TorpedoPerformance } from "./torpedo";
 import SonarSurfaceMaterial, { SONAR_RANGE, SONAR_SPEED, SONAR_TRAVEL_TIME, type SonarPulse } from "./SonarSurfaceMaterial";
 
 type EnemyKind = "scout" | "hunter" | "layer" | "boss";
@@ -40,6 +41,7 @@ type ProjectileState = {
   targetId: string | null;
   age: number;
   fuel: number;
+  turnRate: number;
   falling: boolean;
   sinkTime: number;
   damage: number;
@@ -276,6 +278,7 @@ function createProjectilePool(count: number): ProjectileState[] {
     targetId: null,
     age: 0,
     fuel: 0,
+    turnRate: 0,
     falling: false,
     sinkTime: 0,
     damage: 0,
@@ -521,6 +524,9 @@ const GameScene = memo(function GameScene({
     orbit: new THREE.Vector3(),
     desired: new THREE.Vector3(),
     lookAt: new THREE.Vector3(),
+    tubeForward: new THREE.Vector3(),
+    launchDirection: new THREE.Vector3(),
+    launchOrigin: new THREE.Vector3(),
   }), []);
   const effectLights = useRef<(THREE.PointLight | null)[]>([]);
 
@@ -614,8 +620,7 @@ const GameScene = memo(function GameScene({
       friendly: boolean,
       guided: boolean,
       targetId: string | null,
-      damage: number,
-      speed: number,
+      performance: TorpedoPerformance,
     ) => {
       const projectile = projectiles.find((item) => !item.active);
       if (!projectile) return false;
@@ -623,13 +628,14 @@ const GameScene = memo(function GameScene({
       projectile.friendly = friendly;
       projectile.guided = guided;
       projectile.position.copy(origin);
-      projectile.velocity.copy(direction).normalize().multiplyScalar(speed);
+      projectile.velocity.copy(direction).normalize().multiplyScalar(performance.speed);
       projectile.targetId = targetId;
       projectile.age = 0;
-      projectile.fuel = friendly ? (guided ? 9 : 7) : 8;
+      projectile.fuel = performance.fuel;
+      projectile.turnRate = performance.turnRate;
       projectile.falling = false;
       projectile.sinkTime = 0;
-      projectile.damage = damage;
+      projectile.damage = performance.damage;
       if (projectile.mesh) {
         const body = projectile.mesh.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
         const glow = projectile.mesh.children[1] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
@@ -681,6 +687,10 @@ const GameScene = memo(function GameScene({
     }
     const quaternion = playerMesh.current.quaternion;
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
+    const target = weapon.current === "guided"
+      ? enemies.find((enemy) => enemy.id === lockId.current && enemy.alive && enemy.spawned)
+      : undefined;
+    if (target) tubeDirection(forward, scratch.toPlayer.copy(target.position).sub(playerPosition.current), forward);
     const origin = playerPosition.current.clone().addScaledVector(forward, 7);
     const ok = spawnProjectile(
       origin,
@@ -688,15 +698,14 @@ const GameScene = memo(function GameScene({
       true,
       weapon.current === "guided",
       weapon.current === "guided" ? lockId.current : null,
-      weapon.current === "guided" ? 72 : 95,
-      weapon.current === "guided" ? 34 : 42,
+      playerTorpedoPerformance(vehicle, weapon.current === "guided"),
     );
     if (ok) {
       weaponCooldown.current = weapon.current === "guided" ? 2.6 : 2;
       synth.current.fire();
       setDialogue("first-shot", "NIX「魚雷航走。祈るなら今のうちだ」");
     }
-  }, [setDialogue, spawnProjectile]);
+  }, [enemies, scratch, setDialogue, spawnProjectile, vehicle]);
 
   const deployMine = useCallback(() => {
     const mine = mines.find((item) => !item.active);
@@ -1000,20 +1009,37 @@ const GameScene = memo(function GameScene({
         enemy.velocity.lerp(moveDirection.normalize().multiplyScalar(enemySpeed), 1 - Math.exp(-dt * 0.9));
         enemy.position.addScaledVector(enemy.velocity, dt);
         enemy.position.y = clamp(enemy.position.y, -195, -18);
+        if (enemy.kind !== "boss" && enemy.velocity.lengthSq() > 0.1) {
+          // The modeled bow points along local -Z. Turn the hull before using
+          // its orientation to choose a tube; lateral motion is not tube aim.
+          workQ.setFromUnitVectors(scratch.tubeForward.set(0, 0, -1), scratch.desired.copy(enemy.velocity).normalize());
+          enemy.mesh.quaternion.rotateTowards(workQ, dt * 0.8);
+        }
         enemy.fireCooldown -= dt;
         if (distance < (enemy.kind === "boss" ? 330 : 220) && enemy.fireCooldown <= 0) {
           const shotCount = enemy.kind === "boss" && enemy.hp < 360 ? 3 : 1;
           for (let shot = 0; shot < shotCount; shot += 1) {
-            const direction = scratch.desired.copy(toPlayer).normalize();
-            direction.x += (shot - (shotCount - 1) / 2) * 0.11;
+            const direction = scratch.launchDirection;
+            const aim = scratch.toPlayer.copy(playerPosition.current).sub(enemy.position);
+            let tubeOffset: number;
+            if (enemy.kind === "boss") {
+              // The disc has tubes around its hull; launch outside its surface.
+              direction.copy(aim).normalize().applyAxisAngle(THREE.Object3D.DEFAULT_UP, (shot - (shotCount - 1) / 2) * 0.14);
+              if (direction.lengthSq() < 0.01) direction.set(0, 0, -1);
+              tubeOffset = 1 / Math.sqrt((direction.x ** 2 + direction.z ** 2) / (28 * 28) + direction.y ** 2 / (7 * 7)) + 1.5;
+            } else {
+              scratch.tubeForward.set(0, 0, -1).applyQuaternion(enemy.mesh.quaternion);
+              tubeDirection(scratch.tubeForward, aim, direction);
+              tubeOffset = enemy.kind === "hunter" ? 6 : 5.2;
+            }
+            const origin = scratch.launchOrigin.copy(enemy.position).addScaledVector(direction, tubeOffset);
             spawnProjectile(
-              enemy.position,
+              origin,
               direction,
               false,
               true,
               "player",
-              enemy.kind === "boss" ? 18 : 14,
-              enemy.kind === "boss" ? 25 : 22,
+              enemy.kind === "boss" ? BOSS_TORPEDO : ENEMY_TORPEDO,
             );
           }
           enemy.fireCooldown = enemy.kind === "boss" ? (enemy.hp < 210 ? 2.1 : 3.2) : 4.3 + (enemyIndex % 3);
@@ -1022,8 +1048,6 @@ const GameScene = memo(function GameScene({
       enemy.mesh.position.copy(enemy.position);
       if (enemy.kind === "boss") {
         enemy.mesh.rotation.y += dt * (enemy.hp < 210 ? 0.42 : 0.2);
-      } else if (enemy.velocity.lengthSq() > 0.1) {
-        enemy.mesh.lookAt(scratch.lookAt.copy(enemy.position).add(enemy.velocity));
       }
       const marker = enemy.mesh.getObjectByName("contact-marker");
       if (marker) marker.visible = enemy.detectedUntil > now;
@@ -1115,10 +1139,9 @@ const GameScene = memo(function GameScene({
           targetPosition = target?.position ?? null;
         }
       }
-      if (targetPosition) {
-        const speed = projectile.velocity.length();
-        const desired = scratch.desired.copy(targetPosition).sub(projectile.position).normalize().multiplyScalar(speed);
-        projectile.velocity.lerp(desired, 1 - Math.exp(-dt * 2.4));
+      if (targetPosition && projectile.age > TORPEDO_STRAIGHT_RUN) {
+        const steeringTime = Math.min(dt, projectile.age - TORPEDO_STRAIGHT_RUN);
+        steerTorpedo(projectile.velocity, scratch.desired.copy(targetPosition).sub(projectile.position), projectile.turnRate * steeringTime);
       }
       projectile.position.addScaledVector(projectile.velocity, dt);
 
@@ -1194,7 +1217,7 @@ const GameScene = memo(function GameScene({
       projectile.mesh.visible = projectile.active;
       projectile.mesh.position.copy(projectile.position);
       if (projectile.velocity.lengthSq() > 0.1) {
-        projectile.mesh.lookAt(scratch.lookAt.copy(projectile.position).add(projectile.velocity));
+        projectile.mesh.lookAt(scratch.lookAt.copy(projectile.position).sub(projectile.velocity));
       }
     });
 
@@ -1328,14 +1351,23 @@ const GameScene = memo(function GameScene({
         (enemy) => enemy.id === lockId.current && enemy.alive && enemy.spawned,
       );
       if (!locked) lockId.current = null;
+      // Use the rendered hull heading, including its smoothed turn. Project
+      // onto the horizontal plane so depth differences do not change bearings.
+      const radarForward = scratch.tubeForward.set(0, 0, -1);
+      if (playerMesh.current) radarForward.applyQuaternion(playerMesh.current.quaternion);
+      radarForward.y = 0;
+      radarForward.normalize();
       const contacts = enemies
         .filter((enemy) => enemy.alive && enemy.spawned && enemy.detectedUntil > now)
         .map((enemy) => {
-          const relative = enemy.position.clone().sub(playerPosition.current);
+          const dx = enemy.position.x - playerPosition.current.x;
+          const dz = enemy.position.z - playerPosition.current.z;
+          const ahead = dx * radarForward.x + dz * radarForward.z;
+          const right = -dx * radarForward.z + dz * radarForward.x;
           return {
             id: enemy.id,
-            x: clamp(50 + relative.x * 0.09, 5, 95),
-            y: clamp(50 - relative.z * 0.07, 5, 95),
+            x: clamp(50 + right * 0.09, 5, 95),
+            y: clamp(50 - ahead * 0.07, 5, 95),
             boss: enemy.kind === "boss",
             locked: enemy.id === lockId.current,
           };
