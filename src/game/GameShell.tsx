@@ -110,19 +110,19 @@ export default function GameShell() {
               <h3>選択中の機体</h3>
               <div className="vehicle-select">
                 <button
-                  className={store.selectedVehicle === "zero-skiff" ? "selected" : ""}
-                  onClick={() => store.selectVehicle("zero-skiff")}
+                  className={"ryuou-option " + (store.selectedVehicle === "ryuou" ? "selected" : "")}
+                  onClick={() => store.selectVehicle("ryuou")}
                 >
-                  <strong>ZERO SKIFF</strong>
+                  <strong>りゅうおう <small>RYUOU</small></strong>
                   <span>機動性 A / 耐久 C</span>
                 </button>
                 <button
-                  disabled={!store.unlockedVehicles.includes("manta-x1")}
-                  className={store.selectedVehicle === "manta-x1" ? "selected" : ""}
-                  onClick={() => store.selectVehicle("manta-x1")}
+                  disabled={!store.unlockedVehicles.includes("corback")}
+                  className={"corback-option " + (store.selectedVehicle === "corback" ? "selected" : "")}
+                  onClick={() => store.selectVehicle("corback")}
                 >
-                  <strong>MANTA X-1</strong>
-                  <span>{store.unlockedVehicles.includes("manta-x1") ? "機動性 B / 耐久 A" : "未発見"}</span>
+                  <strong>コーバック号 <small>CORBACK II</small></strong>
+                  <span>{store.unlockedVehicles.includes("corback") ? "機動性 B / 耐久 A" : "未発見"}</span>
                 </button>
               </div>
               <div className="briefing-actions">
@@ -164,7 +164,7 @@ export default function GameShell() {
             {store.lastResult.vehicleDiscovered && (
               <div className="unlock-notice">
                 <span>NEW VEHICLE</span>
-                <strong>MANTA X-1 をアンロック</strong>
+                <strong>コーバック号をアンロック</strong>
               </div>
             )}
             <blockquote>

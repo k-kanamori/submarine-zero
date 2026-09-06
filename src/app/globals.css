@@ -453,6 +453,35 @@ dd {
   box-shadow: inset 3px 0 var(--cyan);
 }
 
+.vehicle-select .ryuou-option,
+.vehicle-select .corback-option {
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: auto 100%;
+  padding-right: 6rem;
+}
+
+.vehicle-select .ryuou-option {
+  background-image: url("/images/ryuou-preview.png");
+}
+
+.vehicle-select .corback-option {
+  background-image: url("/images/corback-preview.png");
+}
+
+.vehicle-select small {
+  display: block;
+  color: var(--muted);
+  font: 600 0.7rem "Rajdhani", sans-serif;
+  letter-spacing: 0.14em;
+}
+
+.game-model-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+}
+
 .vehicle-select span {
   margin-top: 0.35rem;
   color: var(--muted);
@@ -891,10 +920,11 @@ kbd {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 7px;
-  height: 7px;
-  border: 1px solid var(--cyan);
-  transform: translate(-50%, -50%) rotate(45deg);
+  width: 9px;
+  height: 11px;
+  background: var(--cyan);
+  clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%);
+  transform: translate(-50%, -50%);
 }
 
 .sonar-copy {
