@@ -9,6 +9,7 @@ import type { MissionResult } from "./store";
 import { sphereBoxPenetration } from "./collision";
 import RyuouModel from "./RyuouModel";
 import CorbackModel from "./CorbackModel";
+import TaigeiModel from "./TaigeiModel";
 import { steerTorpedo, tubeDirection, playerTorpedoPerformance, ENEMY_TORPEDO, BOSS_TORPEDO, TORPEDO_STRAIGHT_RUN, type TorpedoPerformance } from "./torpedo";
 import SonarSurfaceMaterial, { SONAR_RANGE, SONAR_SPEED, SONAR_TRAVEL_TIME, type SonarPulse } from "./SonarSurfaceMaterial";
 
@@ -341,23 +342,7 @@ function EnemySubmarine({ kind, pulse }: { kind: EnemyKind; pulse: SonarPulse })
     );
   }
 
-  const color = kind === "scout" ? "#6d3c3e" : kind === "hunter" ? "#593035" : "#4f3d45";
-  return (
-    <>
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <capsuleGeometry args={[1.5, kind === "hunter" ? 6.5 : 5, 7, 14]} />
-        <SonarSurfaceMaterial pulse={pulse} enemy color={color} metalness={0.7} roughness={0.45} />
-      </mesh>
-      <mesh position={[0, 0, 2.4]}>
-        <boxGeometry args={[5.5, 0.25, 1.4]} />
-        <SonarSurfaceMaterial pulse={pulse} enemy color="#452c31" />
-      </mesh>
-      <mesh position={[0, 0.3, -3]}>
-        <sphereGeometry args={[0.32, 8, 6]} />
-        <meshBasicMaterial color="#ff493f" toneMapped={false} />
-      </mesh>
-    </>
-  );
+  return <TaigeiModel pulse={pulse} scale={kind === "hunter" ? 1.15 : 1} />;
 }
 
 function TorpedoModel({ friendly }: { friendly: boolean }) {
