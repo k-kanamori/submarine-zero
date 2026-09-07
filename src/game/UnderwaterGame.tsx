@@ -8,9 +8,13 @@ import * as THREE from "three";
 import type { MissionResult } from "./store";
 import { sphereBoxPenetration } from "./collision";
 import { nextLockTarget } from "./targetLock";
+import { damageEnemy } from "./combat";
 import RyuouModel from "./RyuouModel";
 import CorbackModel from "./CorbackModel";
 import TaigeiModel from "./TaigeiModel";
+import AshWingModel from "./AshWingModel";
+import VolcanicEnvironment from "./VolcanicEnvironment";
+import { STAGES, smokeDensityAt, volcanicHeightAt, type StageId } from "./stages";
 import { steerTorpedo, tubeDirection, playerTorpedoPerformance, ENEMY_TORPEDO, BOSS_TORPEDO, TORPEDO_STRAIGHT_RUN, type TorpedoPerformance } from "./torpedo";
 import SonarSurfaceMaterial, { SONAR_RANGE, SONAR_SPEED, SONAR_TRAVEL_TIME, type SonarPulse } from "./SonarSurfaceMaterial";
 
@@ -83,6 +87,7 @@ type HudContact = {
 };
 
 type HudState = {
+  smoke: number;
   hp: number;
   maxHp: number;
   depth: number;
@@ -114,6 +119,7 @@ type InputState = {
 };
 
 const initialHud: HudState = {
+  smoke: 0,
   hp: 100,
   maxHp: 100,
   depth: 25,
@@ -228,7 +234,7 @@ class AudioSynth {
   }
 }
 
-function createEnemies(): EnemyState[] {
+function createEnemies(stageId: StageId): EnemyState[] {
   const positions = [
     [-55, -34, -130], [60, -48, -180], [-18, -70, -235], [88, -60, -285],
     [-80, -92, -345], [20, -105, -405], [95, -110, -465], [-65, -122, -515],
@@ -239,7 +245,7 @@ function createEnemies(): EnemyState[] {
   const escorts = positions.map((position, index): EnemyState => ({
     id: "escort-" + index,
     kind: kinds[index % kinds.length],
-    position: new THREE.Vector3(...position),
+    position: new THREE.Vector3(position[0], stageId === 2 ? position[1] * .45 - 120 : position[1], position[2]),
     velocity: new THREE.Vector3(),
     hp: kinds[index % kinds.length] === "hunter" ? 90 : 65,
     maxHp: kinds[index % kinds.length] === "hunter" ? 90 : 65,
@@ -252,12 +258,12 @@ function createEnemies(): EnemyState[] {
     mesh: null,
   }));
   escorts.push({
-    id: "zero-disc",
+    id: stageId === 2 ? "ash-wing" : "zero-disc",
     kind: "boss",
-    position: new THREE.Vector3(0, -155, -790),
+    position: new THREE.Vector3(0, stageId === 2 ? -170 : -155, -790),
     velocity: new THREE.Vector3(),
-    hp: 600,
-    maxHp: 600,
+    hp: STAGES[stageId].bossHp,
+    maxHp: STAGES[stageId].bossHp,
     fireCooldown: 3,
     detectedUntil: 0,
     alerted: false,
@@ -314,7 +320,8 @@ function PlayerSubmarine({ variant }: { variant: string }) {
   return variant === "corback" ? <CorbackModel /> : <RyuouModel />;
 }
 
-function EnemySubmarine({ kind, pulse }: { kind: EnemyKind; pulse: SonarPulse }) {
+function EnemySubmarine({ kind, pulse, stageId }: { kind: EnemyKind; pulse: SonarPulse; stageId: StageId }) {
+  if (kind === "boss" && stageId === 2) return <AshWingModel pulse={pulse} />;
   if (kind === "boss") {
     return (
       <>
@@ -436,6 +443,7 @@ function IceEnvironment({ pulse }: { pulse: SonarPulse }) {
 }
 
 type GameSceneProps = {
+  stageId: StageId;
   vehicle: string;
   paused: boolean;
   onPause: () => void;
@@ -444,12 +452,15 @@ type GameSceneProps = {
 };
 
 const GameScene = memo(function GameScene({
+  stageId,
   vehicle,
   paused,
   onPause,
   onHud,
   onComplete,
 }: GameSceneProps) {
+  const mission = STAGES[stageId];
+  const terrainColliders = stageId === 2 ? [] : TERRAIN_COLLIDERS;
   const { camera, gl, scene } = useThree();
   const input = useRef<InputState>({
     keys: new Set(),
@@ -460,7 +471,7 @@ const GameScene = memo(function GameScene({
   });
   const synth = useRef(new AudioSynth());
   const playerMesh = useRef<THREE.Group>(null);
-  const playerPosition = useRef(new THREE.Vector3(0, -25, 40));
+  const playerPosition = useRef(new THREE.Vector3(0, -mission.startDepth, 40));
   const playerVelocity = useRef(new THREE.Vector3());
   const yaw = useRef(0);
   const pitch = useRef(0);
@@ -475,7 +486,7 @@ const GameScene = memo(function GameScene({
     age: { value: 99 },
   }), []);
   const lockId = useRef<string | null>(null);
-  const enemies = useMemo(() => createEnemies(), []);
+  const enemies = useMemo(() => createEnemies(stageId), [stageId]);
   const projectiles = useMemo(() => createProjectilePool(72), []);
   const mines = useMemo(() => createTimedPool(10), []);
   const decoys = useMemo(() => createTimedPool(6), []);
@@ -488,11 +499,12 @@ const GameScene = memo(function GameScene({
   const discovered = useRef(false);
   const respawnTimer = useRef(0);
   const completed = useRef(false);
+  const completionReported = useRef(false);
   const completionTimer = useRef(0);
   const terrainImpactCooldown = useRef(0);
   const lastEnemySpawnAt = useRef(0);
   const lastHudUpdate = useRef(0);
-  const dialogue = useRef(initialHud.dialogue);
+  const dialogue = useRef<string>(mission.intro);
   const dialogueFlags = useRef(new Set<string>());
   const cameraTarget = useRef(new THREE.Vector3());
   const workA = useMemo(() => new THREE.Vector3(), []);
@@ -703,7 +715,7 @@ const GameScene = memo(function GameScene({
   const respawn = useCallback(() => {
     playerHp.current = maxHp;
     playerVelocity.current.set(0, 0, 0);
-    playerPosition.current.set(0, checkpoint.current ? -105 : -25, checkpoint.current ? -395 : 40);
+    playerPosition.current.set(0, checkpoint.current ? -mission.checkpointDepth : -mission.startDepth, checkpoint.current ? -395 : 40);
     yaw.current = 0;
     pitch.current = 0;
     projectiles.forEach((projectile) => {
@@ -712,9 +724,9 @@ const GameScene = memo(function GameScene({
     lockId.current = null;
     respawnTimer.current = 0;
     setDialogue("respawn-" + elapsed.current, checkpoint.current
-      ? "NIX「観測施設の記録点から再開。今度は沈まないでくれ」"
+      ? (stageId === 2 ? "NIX「火山観測ブイから再開。噴煙を避けて進もう」" : "NIX「観測施設の記録点から再開。今度は沈まないでくれ」")
       : "NIX「予備機へ意識を戻した。君は相変わらず乱暴だ」");
-  }, [maxHp, projectiles, setDialogue]);
+  }, [maxHp, projectiles, setDialogue, mission, stageId]);
 
   useFrame((state, frameDelta) => {
     const dt = Math.min(frameDelta, 0.05);
@@ -861,12 +873,23 @@ const GameScene = memo(function GameScene({
         );
       }
 
-      for (const collider of TERRAIN_COLLIDERS) {
+      for (const collider of terrainColliders) {
         const penetration = sphereBoxPenetration(
           playerPosition.current, PLAYER_COLLISION_RADIUS,
           collider.center, collider.halfSize, scratch.contactNormal,
         );
         registerCollision(scratch.contactNormal, penetration);
+      }
+
+      if (stageId === 2) {
+        const { x, z } = playerPosition.current;
+        const ground = volcanicHeightAt(x, z);
+        const penetration = ground + PLAYER_COLLISION_RADIUS - playerPosition.current.y;
+        if (penetration > 0) {
+          scratch.contactNormal.set(volcanicHeightAt(x - 1, z) - volcanicHeightAt(x + 1, z),
+            2, volcanicHeightAt(x, z - 1) - volcanicHeightAt(x, z + 1)).normalize();
+          registerCollision(scratch.contactNormal, penetration);
+        }
       }
 
       if (collisionDepth > 0) {
@@ -920,10 +943,10 @@ const GameScene = memo(function GameScene({
 
       if (!checkpoint.current && (kills.current >= 5 || playerPosition.current.z < -375)) {
         checkpoint.current = true;
-        setDialogue("checkpoint", "NIX「観測施設を記録点に設定。次に沈んでも、ここまでは戻れる」");
+        setDialogue("checkpoint", stageId === 2 ? "NIX「火山観測ブイを記録点に設定。ここからカルデラ深部へ」" : "NIX「観測施設を記録点に設定。次に沈んでも、ここまでは戻れる」");
       }
 
-      if (!discovered.current && playerPosition.current.distanceToSquared(DISCOVERY_POSITION) < 22 * 22) {
+      if (stageId === 1 && !discovered.current && playerPosition.current.distanceToSquared(DISCOVERY_POSITION) < 22 * 22) {
         discovered.current = true;
         setDialogue("discovery", "NIX「放棄機体コーバック号。帰還できれば、君のものだ」");
       }
@@ -961,7 +984,7 @@ const GameScene = memo(function GameScene({
       if (!boss.alerted) {
         boss.alerted = true;
         boss.detectedUntil = now + 999;
-        setDialogue("boss", "NIX「円盤型を確認。大きいね。依頼書は縮尺を間違えたらしい」");
+        setDialogue("boss", stageId === 2 ? "NIX「ASH WINGを確認。翼を持つ潜水艦だ。高速の旋回と双発魚雷に注意して」" : "NIX「円盤型を確認。大きいね。依頼書は縮尺を間違えたらしい」");
         synth.current.warning();
       }
     }
@@ -979,12 +1002,17 @@ const GameScene = memo(function GameScene({
         const moveDirection = scratch.moveDirection.copy(toPlayer).normalize();
         if (distance < desiredDistance) moveDirection.multiplyScalar(-0.55);
         const orbit = scratch.orbit.set(-toPlayer.z, 0, toPlayer.x).normalize();
-        moveDirection.addScaledVector(orbit, enemy.kind === "boss" ? 0.28 : (enemyIndex % 2 ? 0.38 : -0.38));
-        const enemySpeed = enemy.kind === "boss" ? 3.2 : enemy.kind === "scout" ? 10 : 7;
+        moveDirection.addScaledVector(orbit, enemy.kind === "boss" ? (stageId === 2 ? .9 : .28) : (enemyIndex % 2 ? 0.38 : -0.38));
+        const enemySpeed = enemy.kind === "boss" ? (stageId === 2 ? 9 : 3.2) : enemy.kind === "scout" ? 10 : 7;
         enemy.velocity.lerp(moveDirection.normalize().multiplyScalar(enemySpeed), 1 - Math.exp(-dt * 0.9));
         enemy.position.addScaledVector(enemy.velocity, dt);
         enemy.position.y = clamp(enemy.position.y, -195, -18);
-        if (enemy.kind !== "boss" && enemy.velocity.lengthSq() > 0.1) {
+        if (stageId === 2) {
+          enemy.position.x = clamp(enemy.position.x, -205, 205);
+          enemy.position.z = clamp(enemy.position.z, -1060, 60);
+          enemy.position.y = Math.max(enemy.position.y, volcanicHeightAt(enemy.position.x, enemy.position.z) + (enemy.kind === "boss" ? 12 : 6));
+        }
+        if ((enemy.kind !== "boss" || stageId === 2) && enemy.velocity.lengthSq() > 0.1) {
           // The modeled bow points along local -Z. Turn the hull before using
           // its orientation to choose a tube; lateral motion is not tube aim.
           workQ.setFromUnitVectors(scratch.tubeForward.set(0, 0, -1), scratch.desired.copy(enemy.velocity).normalize());
@@ -992,12 +1020,12 @@ const GameScene = memo(function GameScene({
         }
         enemy.fireCooldown -= dt;
         if (distance < (enemy.kind === "boss" ? 330 : 220) && enemy.fireCooldown <= 0) {
-          const shotCount = enemy.kind === "boss" && enemy.hp < 360 ? 3 : 1;
+          const shotCount = enemy.kind === "boss" ? (stageId === 2 ? (enemy.hp < enemy.maxHp * .45 ? 3 : 2) : (enemy.hp < 360 ? 3 : 1)) : 1;
           for (let shot = 0; shot < shotCount; shot += 1) {
             const direction = scratch.launchDirection;
             const aim = scratch.toPlayer.copy(playerPosition.current).sub(enemy.position);
             let tubeOffset: number;
-            if (enemy.kind === "boss") {
+            if (enemy.kind === "boss" && stageId === 1) {
               // The disc has tubes around its hull; launch outside its surface.
               direction.copy(aim).normalize().applyAxisAngle(THREE.Object3D.DEFAULT_UP, (shot - (shotCount - 1) / 2) * 0.14);
               if (direction.lengthSq() < 0.01) direction.set(0, 0, -1);
@@ -1005,9 +1033,12 @@ const GameScene = memo(function GameScene({
             } else {
               scratch.tubeForward.set(0, 0, -1).applyQuaternion(enemy.mesh.quaternion);
               tubeDirection(scratch.tubeForward, aim, direction);
-              tubeOffset = enemy.kind === "hunter" ? 6 : 5.2;
+              tubeOffset = enemy.kind === "boss" ? 18 : enemy.kind === "hunter" ? 6 : 5.2;
             }
             const origin = scratch.launchOrigin.copy(enemy.position).addScaledVector(direction, tubeOffset);
+            if (enemy.kind === "boss" && stageId === 2) {
+              origin.add(scratch.orbit.set((shot - (shotCount - 1) / 2) * 3.2, -1.5, 0).applyQuaternion(enemy.mesh.quaternion));
+            }
             spawnProjectile(
               origin,
               direction,
@@ -1021,7 +1052,7 @@ const GameScene = memo(function GameScene({
         }
       }
       enemy.mesh.position.copy(enemy.position);
-      if (enemy.kind === "boss") {
+      if (enemy.kind === "boss" && stageId === 1) {
         enemy.mesh.rotation.y += dt * (enemy.hp < 210 ? 0.42 : 0.2);
       }
       const marker = enemy.mesh.getObjectByName("contact-marker");
@@ -1038,6 +1069,21 @@ const GameScene = memo(function GameScene({
       decoy.mesh.rotation.y += dt * 3;
     });
 
+    const hitEnemy = (target: EnemyState, damage: number) => {
+      if (completed.current || !damageEnemy(target, damage)) return;
+      spawnExplosion(target.position, target.kind === "boss" ? 38 : 12);
+      if (target.kind === "boss") {
+        completed.current = true;
+        completionTimer.current = 3.2;
+        lockId.current = null;
+        setDialogue("boss-down", stageId === 2 ? "NIX「ASH WING沈黙。噴煙の向こうに帰還ルートを確認した」" : "NIX「標的沈黙。識別符号を回収した……これは、二十年前のものだ」");
+      } else {
+        kills.current += 1;
+        if (kills.current === 3) setDialogue("kills-3", "NIX「三隻撃破。海が少し静かになった」");
+        if (kills.current === 7) setDialogue("kills-7", "NIX「残りは深部だ。巨大な反応も近い」");
+      }
+    };
+
     mines.forEach((mine) => {
       if (!mine.mesh) return;
       mine.ttl -= mine.active ? dt : 0;
@@ -1050,7 +1096,7 @@ const GameScene = memo(function GameScene({
             enemy.position.distanceTo(mine.position) < (enemy.kind === "boss" ? 35 : 16),
         );
         if (target) {
-          target.hp -= 85;
+          hitEnemy(target, 85);
           spawnExplosion(mine.position, 7);
           synth.current.explosion();
           mine.active = false;
@@ -1126,7 +1172,8 @@ const GameScene = memo(function GameScene({
         Math.abs(projectile.position.x) >= SEA_HALF_WIDTH ||
         projectile.position.z <= SEA_FRONT_Z ||
         projectile.position.z >= SEA_BACK_Z ||
-        TERRAIN_COLLIDERS.some(
+        (stageId === 2 && projectile.position.y <= volcanicHeightAt(projectile.position.x, projectile.position.z) + .8) ||
+        terrainColliders.some(
           (collider) =>
             Math.abs(projectile.position.x - collider.center.x) <= collider.halfSize.x &&
             Math.abs(projectile.position.y - collider.center.y) <= collider.halfSize.y &&
@@ -1150,24 +1197,10 @@ const GameScene = memo(function GameScene({
             enemy.position.distanceTo(projectile.position) < (enemy.kind === "boss" ? 28 : 5.2),
         );
         if (target) {
-          target.hp -= projectile.damage;
+          hitEnemy(target, projectile.damage);
           projectile.active = false;
           spawnExplosion(projectile.position, target.kind === "boss" ? 10 : 5);
           synth.current.explosion(target.kind === "boss");
-          if (target.hp <= 0) {
-            target.alive = false;
-            spawnExplosion(target.position, target.kind === "boss" ? 38 : 12);
-            if (target.kind === "boss") {
-              completed.current = true;
-              completionTimer.current = 3.2;
-              lockId.current = null;
-              setDialogue("boss-down", "NIX「標的沈黙。識別符号を回収した……これは、二十年前のものだ」");
-            } else {
-              kills.current += 1;
-              if (kills.current === 3) setDialogue("kills-3", "NIX「三隻撃破。海が少し静かになった」");
-              if (kills.current === 7) setDialogue("kills-7", "NIX「残りは深部だ。巨大な反応も近い」");
-            }
-          }
         }
       } else if (
         projectile.active &&
@@ -1297,21 +1330,23 @@ const GameScene = memo(function GameScene({
     }
 
     const depth = Math.max(0, -playerPosition.current.y);
+    const smoke = stageId === 2 ? smokeDensityAt(playerPosition.current.x, playerPosition.current.y, playerPosition.current.z) : 0;
     if (scene.fog instanceof THREE.FogExp2) {
-      scene.fog.density = 0.009 + depth * 0.000055;
-      scene.fog.color.set(depth > 120 ? "#010b0f" : "#062830");
+      scene.fog.density = stageId === 2 ? .018 + smoke * .024 : 0.009 + depth * 0.000055;
+      scene.fog.color.set(stageId === 2 ? "#191b17" : depth > 120 ? "#010b0f" : "#062830");
     }
     if (scene.background instanceof THREE.Color) {
-      scene.background.set(depth > 120 ? "#01090c" : "#06242a");
+      scene.background.set(stageId === 2 ? "#141915" : depth > 120 ? "#01090c" : "#06242a");
     }
 
-    if (completed.current) {
+    if (completed.current && !completionReported.current) {
       completionTimer.current -= dt;
       if (completionTimer.current <= 0) {
-        completed.current = false;
-        const score = 8000 + kills.current * 750 + (discovered.current ? 3000 : 0) +
+        completionReported.current = true;
+        const score = (stageId === 2 ? 12000 : 8000) + kills.current * 750 + (discovered.current ? 3000 : 0) +
           Math.max(0, Math.floor(600 - elapsed.current) * 10);
         onComplete({
+          stageId,
           score,
           enemiesDestroyed: kills.current + 1,
           elapsedSeconds: elapsed.current,
@@ -1350,11 +1385,12 @@ const GameScene = memo(function GameScene({
           };
         });
       const objective = currentBoss?.alerted
-        ? "円盤型巨大潜水艦を撃破せよ"
+        ? (stageId === 2 ? "ASH WINGを撃破せよ" : "円盤型巨大潜水艦を撃破せよ")
         : kills.current < 5
           ? "護衛艇を索敵・突破せよ"
-          : "観測施設の深部へ向かえ";
+          : (stageId === 2 ? "カルデラ深部へ向かえ" : "観測施設の深部へ向かえ");
       onHud({
+        smoke,
         hp: Math.max(0, playerHp.current),
         maxHp,
         depth,
@@ -1363,7 +1399,7 @@ const GameScene = memo(function GameScene({
         sonarCooldown: sonarCooldown.current,
         sonarActive: sonarAge.current < SONAR_TRAVEL_TIME,
         weapon: weapon.current,
-        lockedName: locked ? (locked.kind === "boss" ? "UNKNOWN DISC" : locked.kind.toUpperCase()) : null,
+        lockedName: locked ? (locked.kind === "boss" ? mission.bossCode : locked.kind.toUpperCase()) : null,
         lockedDistance: locked ? locked.position.distanceTo(playerPosition.current) : 0,
         kills: kills.current,
         objective,
@@ -1383,9 +1419,9 @@ const GameScene = memo(function GameScene({
     <>
       <fogExp2 attach="fog" args={["#062830", 0.011]} />
       <color attach="background" args={["#06242a"]} />
-      <ambientLight color="#6ca9a7" intensity={0.3} />
-      <directionalLight position={[30, 80, 10]} color="#b7f4ee" intensity={1.25} />
-      <IceEnvironment pulse={sonarPulse} />
+      <ambientLight color={stageId === 2 ? "#c1ab86" : "#6ca9a7"} intensity={stageId === 2 ? .38 : .3} />
+      <directionalLight position={[30, 80, 10]} color={stageId === 2 ? "#dbcaa0" : "#b7f4ee"} intensity={stageId === 2 ? .8 : 1.25} />
+      {stageId === 2 ? <VolcanicEnvironment pulse={sonarPulse} /> : <IceEnvironment pulse={sonarPulse} />}
       {Array.from({ length: EFFECT_LIGHT_COUNT }, (_, index) => (
         <pointLight
           key={index}
@@ -1406,7 +1442,7 @@ const GameScene = memo(function GameScene({
           position={enemy.position.toArray()}
           visible={enemy.alive && enemy.spawned}
         >
-          <EnemySubmarine kind={enemy.kind} pulse={sonarPulse} />
+          <EnemySubmarine kind={enemy.kind} pulse={sonarPulse} stageId={stageId} />
           <group name="contact-marker" position={[0, enemy.kind === "boss" ? 35 : 6, 0]}>
             <mesh rotation={[Math.PI / 2, 0, 0]}>
               <torusGeometry args={[enemy.kind === "boss" ? 8 : 2.8, 0.16, 8, 28]} />
@@ -1464,7 +1500,7 @@ const GameScene = memo(function GameScene({
         />
       </mesh>
 
-      <group ref={discoveryMesh} position={[72, -106, -432]}>
+      {stageId === 1 && <group ref={discoveryMesh} position={[72, -106, -432]}>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <torusGeometry args={[5, 0.12, 8, 32]} />
           <meshBasicMaterial color="#ffd36a" toneMapped={false} />
@@ -1472,12 +1508,12 @@ const GameScene = memo(function GameScene({
         <group scale={0.75} rotation={[0, 0.2, 0]}>
           <CorbackModel active={false} />
         </group>
-      </group>
+      </group>}
     </>
   );
 });
 
-function Hud({ hud }: { hud: HudState }) {
+function Hud({ hud, stageId }: { hud: HudState; stageId: StageId }) {
   const minutes = Math.floor(hud.elapsed / 60);
   const seconds = String(Math.floor(hud.elapsed % 60)).padStart(2, "0");
   const hpPercent = (hud.hp / hud.maxHp) * 100;
@@ -1493,9 +1529,10 @@ function Hud({ hud }: { hud: HudState }) {
       </div>
 
       <div className="hud-top-right">
-        <span>ICE SECTOR 04</span>
+        <span>{STAGES[stageId].sector}</span>
         <strong>{minutes}:{seconds}</strong>
         <small>HOSTILES {hud.kills}/10</small>
+        {stageId === 2 && <p className="smoke-warning">{hud.smoke > .25 ? "濃い噴煙内 // Q ソナー" : "火山性噴煙 // 視界不良"}</p>}
       </div>
 
       <div className={"crosshair " + (hud.lockedName ? "locked" : "")}>
@@ -1538,8 +1575,8 @@ function Hud({ hud }: { hud: HudState }) {
 
       {hud.bossActive && (
         <div className="boss-health">
-          <span>BOUNTY TARGET // UNKNOWN DISC</span>
-          <div><i style={{ width: (hud.bossHp / 600) * 100 + "%" }} /></div>
+          <span>BOUNTY TARGET // {STAGES[stageId].bossCode}</span>
+          <div><i style={{ width: (hud.bossHp / STAGES[stageId].bossHp) * 100 + "%" }} /></div>
         </div>
       )}
 
@@ -1575,7 +1612,7 @@ const GameViewport = memo(function GameViewport(props: GameSceneProps) {
   return (
     <>
       <Canvas
-        camera={{ position: [0, -18, 58], fov: 61, near: 0.1, far: 1300 }}
+        camera={{ position: [0, -STAGES[props.stageId].startDepth + 7, 58], fov: 61, near: 0.1, far: 1300 }}
         dpr={[0.75, 1]}
         frameloop={props.paused ? "demand" : "always"}
         gl={{ antialias: true, powerPreference: "high-performance" }}
@@ -1596,28 +1633,32 @@ const GameViewport = memo(function GameViewport(props: GameSceneProps) {
 });
 
 export default function UnderwaterGame({
+  stageId = 1,
   vehicle,
   onExit,
   onComplete,
 }: {
+  stageId?: StageId;
   vehicle: string;
   onExit: () => void;
   onComplete: (result: MissionResult) => void;
 }) {
-  const [hud, setHud] = useState<HudState>({ ...initialHud, maxHp: vehicle === "corback" ? 150 : 100 });
+  const [hud, setHud] = useState<HudState>({ ...initialHud, depth: STAGES[stageId].startDepth,
+    dialogue: STAGES[stageId].intro, bossHp: STAGES[stageId].bossHp, maxHp: vehicle === "corback" ? 150 : 100 });
   const [paused, setPaused] = useState(false);
   const togglePause = useCallback(() => setPaused((value) => !value), []);
 
   return (
     <section className="game-screen">
       <GameViewport
+        stageId={stageId}
         vehicle={vehicle}
         paused={paused}
         onPause={togglePause}
         onHud={setHud}
         onComplete={onComplete}
       />
-      <Hud hud={hud} />
+      <Hud hud={hud} stageId={stageId} />
       <button className="pause-button" onClick={togglePause}>Ⅱ</button>
       <div className="game-tip">クリックで操艦 // Q ソナー // E ロック // 左クリック 発射</div>
 

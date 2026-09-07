@@ -30,7 +30,7 @@ test("legacy saves retain scores and transfer the second craft unlock to Corback
     assert.equal(useGameStore.getState().bestScore, 18750);
     assert.deepEqual(useGameStore.getState().unlockedVehicles, ["ryuou", "corback"]);
     useGameStore.getState().selectVehicle("corback");
-    assert.equal(JSON.parse(values.get("deep-zero-save-v1")).version, 2);
+    assert.equal(JSON.parse(values.get("deep-zero-save-v1")).version, 3);
     const reloaded = (await import(url + "#reload")).useGameStore;
     assert.equal(reloaded.getState().selectedVehicle, "corback");
     assert.equal(reloaded.getState().bestScore, 18750);
@@ -63,6 +63,27 @@ test("legacy saves retain scores and transfer the second craft unlock to Corback
     const unlockedReload = (await import(url + "#unlocked-reload")).useGameStore;
     assert.equal(unlockedReload.getState().selectedVehicle,"corback");
     assert.deepEqual(unlockedReload.getState().unlockedVehicles,["ryuou","corback"]);
+
+    // Stage selection and completion survive reload without losing vehicle progress.
+    unlockedReload.getState().selectStage(2);
+    unlockedReload.getState().completeMission({...result,stageId:2});
+    assert.equal(unlockedReload.getState().lastResult.stageId,2);
+    assert.deepEqual(unlockedReload.getState().clearedStages,[1,2]);
+    const stageReload = (await import(url + "#stage-reload")).useGameStore;
+    assert.equal(stageReload.getState().selectedStage,2);
+    assert.deepEqual(stageReload.getState().clearedStages,[1,2]);
+    stageReload.getState().resetProgress();
+    assert.equal(stageReload.getState().selectedStage,1);
+    assert.deepEqual(stageReload.getState().clearedStages,[]);
+
+    values.set("deep-zero-save-v1",JSON.stringify({version:2,state:{
+      selectedVehicle:"corback",unlockedVehicles:["ryuou","corback"],bestScore:19000,
+    }}));
+    const v2=(await import(url + "#v2-stage-migration")).useGameStore;
+    assert.equal(v2.getState().selectedStage,1);
+    assert.deepEqual(v2.getState().clearedStages,[]);
+    assert.equal(v2.getState().bestScore,19000);
+    assert.equal(v2.getState().selectedVehicle,"corback");
   } finally {
     if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow);
     else delete globalThis.window;
