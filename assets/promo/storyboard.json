@@ -1,0 +1,58 @@
+[
+  {
+    "start": 0,
+    "end": 4,
+    "still": 0,
+    "kicker": "INTO THE ABYSS",
+    "title": "深海のゼロ",
+    "subtitle": "闇に音を放ち、重い一撃を見届ける。"
+  },
+  {
+    "start": 4,
+    "end": 8,
+    "still": 3,
+    "kicker": "01 / SONAR",
+    "title": "音を放て。闇を暴け。",
+    "subtitle": "索敵は、敵への合図にもなる。"
+  },
+  {
+    "start": 8,
+    "end": 12,
+    "still": 5,
+    "kicker": "02 / TARGET LOCK",
+    "title": "狙う敵を、切り替えろ。",
+    "subtitle": "右クリック / E で対象切替。ロックした敵は緑に。"
+  },
+  {
+    "start": 12,
+    "end": 16,
+    "still": 6,
+    "kicker": "03 / TORPEDO",
+    "title": "一撃を、見届けろ。",
+    "subtitle": "追尾する誘導魚雷。進路を読む手動魚雷。"
+  },
+  {
+    "start": 16,
+    "end": 20,
+    "still": 9,
+    "kicker": "DISCOVER / UNLOCK",
+    "title": "発見が、次を開く。",
+    "subtitle": "コーバック号を発見し、任務クリアで解放。"
+  },
+  {
+    "start": 20,
+    "end": 25,
+    "still": 10,
+    "kicker": "BOUNTY TARGET",
+    "title": "賞金首は、氷の深部に。",
+    "subtitle": "円盤型巨大潜水艦に挑め。"
+  },
+  {
+    "start": 25,
+    "end": 30,
+    "still": 14,
+    "kicker": "SUBMARINE ACTION / PC BROWSER",
+    "title": "深海のゼロ",
+    "subtitle": "潜航を開始せよ。"
+  }
+]

@@ -1,0 +1,21 @@
+{
+  "file": "shinkai-zero-promo-30s.mp4",
+  "bytes": 7291895,
+  "tracks": [
+    {
+      "type": "vide",
+      "codec": "avc1",
+      "duration": 30.0,
+      "samples": 720,
+      "width": 1920.0,
+      "height": 1080.0,
+      "fps": 24.0
+    },
+    {
+      "type": "soun",
+      "codec": "mp4a",
+      "duration": 30.023378684807255,
+      "samples": 1293
+    }
+  ]
+}
