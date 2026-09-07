@@ -1171,6 +1171,7 @@ const GameScene = memo(function GameScene({
         }
       } else if (
         projectile.active &&
+        !completed.current &&
         respawnTimer.current <= 0 &&
         projectile.position.distanceTo(playerPosition.current) < 4.8
       ) {
