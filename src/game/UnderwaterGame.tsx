@@ -7,6 +7,7 @@ import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import * as THREE from "three";
 import type { MissionResult } from "./store";
 import { sphereBoxPenetration } from "./collision";
+import { nextLockTarget } from "./targetLock";
 import RyuouModel from "./RyuouModel";
 import CorbackModel from "./CorbackModel";
 import TaigeiModel from "./TaigeiModel";
@@ -649,18 +650,7 @@ const GameScene = memo(function GameScene({
   }, [enemies, setDialogue, sonarPulse]);
 
   const selectLock = useCallback(() => {
-    const candidates = enemies
-      .filter(
-        (enemy) =>
-          enemy.alive &&
-          enemy.spawned &&
-          (enemy.detectedUntil > elapsed.current || enemy.position.distanceTo(playerPosition.current) < 115),
-      )
-      .sort(
-        (a, b) =>
-          a.position.distanceTo(playerPosition.current) - b.position.distanceTo(playerPosition.current),
-      );
-    lockId.current = candidates[0]?.id ?? null;
+    lockId.current = nextLockTarget(enemies, lockId.current, playerPosition.current, elapsed.current);
     if (!lockId.current) setDialogue("no-contact", "NIX「ロックするには、まず見つけることだね」");
   }, [enemies, setDialogue]);
 
@@ -1343,7 +1333,8 @@ const GameScene = memo(function GameScene({
       radarForward.y = 0;
       radarForward.normalize();
       const contacts = enemies
-        .filter((enemy) => enemy.alive && enemy.spawned && enemy.detectedUntil > now)
+        .filter((enemy) => enemy.alive && enemy.spawned &&
+          (enemy.detectedUntil > now || enemy.id === lockId.current))
         .map((enemy) => {
           const dx = enemy.position.x - playerPosition.current.x;
           const dz = enemy.position.z - playerPosition.current.z;

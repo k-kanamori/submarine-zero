@@ -909,11 +909,15 @@ kbd {
 }
 
 .sonar-grid b.target {
+  z-index: 1;
+  background: #65ff8f;
+  border-color: #65ff8f;
+  box-shadow: 0 0 8px #65ff8f;
   animation: contactPulse 0.7s ease-in-out infinite alternate;
 }
 
 @keyframes contactPulse {
-  to { box-shadow: 0 0 18px 4px rgba(255, 78, 67, 0.72); }
+  to { box-shadow: 0 0 18px 4px rgba(101, 255, 143, 0.72); }
 }
 
 .sonar-self {
