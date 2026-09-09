@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 export default function CorbackModel({ active = true }: { active?: boolean }) {
-  const gltf = useLoader(GLTFLoader, "/models/corback.glb");
+  const gltf = useLoader(GLTFLoader, "/submarine-zero/models/corback.glb");
   const model = useMemo(() => {
     const scene = gltf.scene.clone(true);
     return { scene, rotor: scene.getObjectByName("Corback_Rotor_Game") };

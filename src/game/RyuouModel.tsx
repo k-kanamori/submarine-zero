@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 export default function RyuouModel() {
-  const gltf = useLoader(GLTFLoader, "/models/ryuou.glb");
+  const gltf = useLoader(GLTFLoader, "/submarine-zero/models/ryuou.glb");
   const model = useMemo(() => {
     // Keep the cached geometry/materials, but give each mission its own transforms.
     const scene = gltf.scene.clone(true);

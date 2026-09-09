@@ -6,7 +6,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import SonarSurfaceMaterial, { type SonarPulse } from "./SonarSurfaceMaterial";
 
 export default function AshWingModel({ pulse }: { pulse: SonarPulse }) {
-  const gltf = useLoader(GLTFLoader, "/models/ash-wing.glb");
+  const gltf = useLoader(GLTFLoader, "/submarine-zero/models/ash-wing.glb");
   const rotors = useRef<(THREE.Group | null)[]>([]);
   const groups = useMemo(() => {
     gltf.scene.updateMatrixWorld(true);

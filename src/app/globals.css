@@ -462,11 +462,11 @@ dd {
 }
 
 .vehicle-select .ryuou-option {
-  background-image: url("/images/ryuou-preview.png");
+  background-image: url("/submarine-zero/images/ryuou-preview.png");
 }
 
 .vehicle-select .corback-option {
-  background-image: url("/images/corback-preview.png");
+  background-image: url("/submarine-zero/images/corback-preview.png");
 }
 
 .vehicle-select small {
@@ -856,7 +856,7 @@ kbd {
 
 .stage-select button { padding: 0.7rem; font-size: 0.75rem; }
 .stage-select button[aria-pressed="true"] { border-color: #ffab6a; color: #ffd1a7; background: #432b20; }
-.ash-wing-briefing { width: 100%; height: 100%; background: url('/images/ash-wing-preview.png') center / contain no-repeat; }
+.ash-wing-briefing { width: 100%; height: 100%; background: url('/submarine-zero/images/ash-wing-preview.png') center / contain no-repeat; }
 .smoke-warning { color: #ffc28a; font-size: 0.7rem; letter-spacing: 0.08em; }
 
 .sonar-panel {

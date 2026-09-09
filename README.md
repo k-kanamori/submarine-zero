@@ -20,6 +20,22 @@ Node.js 20.19以降を推奨します。
     npm run build
     npm start
 
+## Dockerで起動
+
+Dockerが動作する環境で、プロジェクトのルートから実行します。
+
+```bash
+docker build -t submarine-zero .
+docker run --rm -p 3000:3000 --name submarine-zero submarine-zero
+```
+
+ブラウザで http://localhost:3000/submarine-zero を開きます。ポートが使用中の場合は
+`-p 8080:3000` に変更して http://localhost:8080/submarine-zero を開いてください。
+
+DockerビルドではNext.jsのstandalone出力を使用し、非rootユーザーで起動します。
+ゲームのモデルや画像を含む`public`を同梱し、Blenderの編集データや動画は除外します。
+通常の`npm run build`と`npm start`は従来どおり使用できます。
+
 ## 描画負荷と検証
 
 高密度ディスプレイでも3D描画のピクセル比を最大1に抑えます。HUDの文字は

@@ -1,0 +1,16 @@
+.git
+.next
+node_modules
+.env*
+*.log
+*.tsbuildinfo
+.DS_Store
+**/.DS_Store
+assets
+output
+docs
+sample
+tests
+README.md
+AGENTS.md
+CLAUDE.md
