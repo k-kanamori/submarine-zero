@@ -1,4 +1,6 @@
 "use client";
+
+import { assetPath } from "../lib/base-path";
 import { useFrame, useLoader } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -6,7 +8,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import SonarSurfaceMaterial, { type SonarPulse } from "./SonarSurfaceMaterial";
 
 export default function AshWingModel({ pulse }: { pulse: SonarPulse }) {
-  const gltf = useLoader(GLTFLoader, "/submarine-zero/models/ash-wing.glb");
+  const gltf = useLoader(GLTFLoader, assetPath("/models/ash-wing.glb"));
   const rotors = useRef<(THREE.Group | null)[]>([]);
   const groups = useMemo(() => {
     gltf.scene.updateMatrixWorld(true);

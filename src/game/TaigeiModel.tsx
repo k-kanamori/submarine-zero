@@ -1,5 +1,7 @@
 "use client";
 
+import { assetPath } from "../lib/base-path";
+
 import { useFrame, useLoader } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -13,7 +15,7 @@ type Part = {
 };
 
 export default function TaigeiModel({ pulse, scale = 1 }: { pulse: SonarPulse; scale?: number }) {
-  const gltf = useLoader(GLTFLoader, "/submarine-zero/models/taigei.glb");
+  const gltf = useLoader(GLTFLoader, assetPath("/models/taigei.glb"));
   const rotor = useRef<THREE.Group>(null);
   const model = useMemo(() => {
     gltf.scene.updateMatrixWorld(true);

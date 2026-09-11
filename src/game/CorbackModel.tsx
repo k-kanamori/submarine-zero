@@ -1,12 +1,14 @@
 "use client";
 
+import { assetPath } from "../lib/base-path";
+
 import { useFrame, useLoader } from "@react-three/fiber";
 import { useMemo } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 export default function CorbackModel({ active = true }: { active?: boolean }) {
-  const gltf = useLoader(GLTFLoader, "/submarine-zero/models/corback.glb");
+  const gltf = useLoader(GLTFLoader, assetPath("/models/corback.glb"));
   const model = useMemo(() => {
     const scene = gltf.scene.clone(true);
     return { scene, rotor: scene.getObjectByName("Corback_Rotor_Game") };

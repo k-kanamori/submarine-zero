@@ -7,6 +7,8 @@ FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT=standalone
+ARG NEXT_PUBLIC_BASE_PATH=/submarine-zero
+ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

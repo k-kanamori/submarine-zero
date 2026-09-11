@@ -13,7 +13,25 @@ Node.js 20.19以降を推奨します。
     npm install
     npm run dev
 
-ブラウザで http://localhost:3000 を開きます。
+ブラウザで http://localhost:3000/submarine-zero を開きます。
+
+ベースパスは環境変数 `NEXT_PUBLIC_BASE_PATH` で指定できます。未指定時は
+`/submarine-zero`、空文字（`NEXT_PUBLIC_BASE_PATH=`）ならルート `/` になります。
+サブパスは `/game` のように先頭に `/` を付け、末尾の `/` は付けないでください。
+`.env.example` を `.env.local` にコピーして設定するか、起動時に指定します。
+
+```bash
+NEXT_PUBLIC_BASE_PATH=/game npm run dev
+```
+
+この場合は http://localhost:3000/game を開きます。開発中の変更後は開発サーバーを
+再起動してください。本番ではビルド時に確定するため、変更後は同じ環境変数を
+設定して再ビルド・起動してください。
+
+```bash
+NEXT_PUBLIC_BASE_PATH=/game npm run build
+NEXT_PUBLIC_BASE_PATH=/game npm start
+```
 
 本番ビルド：
 
@@ -31,6 +49,15 @@ docker run --rm -p 3000:3000 --name submarine-zero submarine-zero
 
 ブラウザで http://localhost:3000/submarine-zero を開きます。ポートが使用中の場合は
 `-p 8080:3000` に変更して http://localhost:8080/submarine-zero を開いてください。
+
+Dockerで変更する場合もビルド時に指定します。
+
+```bash
+docker build --build-arg NEXT_PUBLIC_BASE_PATH=/game -t submarine-zero .
+```
+
+ルート `/` にする場合は `--build-arg NEXT_PUBLIC_BASE_PATH=` を指定します。
+`docker run -e` だけではベースパスを変更できません。
 
 DockerビルドではNext.jsのstandalone出力を使用し、非rootユーザーで起動します。
 ゲームのモデルや画像を含む`public`を同梱し、Blenderの編集データや動画は除外します。

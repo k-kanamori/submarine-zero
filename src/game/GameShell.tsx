@@ -1,5 +1,6 @@
 "use client";
 
+import { assetPath } from "../lib/base-path";
 import dynamic from "next/dynamic";
 import { useSyncExternalStore } from "react";
 import { useGameStore } from "./store";
@@ -97,7 +98,7 @@ export default function GameShell() {
               <h2>{mission.title}</h2>
               <div className="mission-visual">
                 {store.selectedStage === 2
-                  ? <div className="ash-wing-briefing" role="img" aria-label="双発・長翼の飛行機型潜水艦 ASH WING" />
+                  ? <div className="ash-wing-briefing" style={{ backgroundImage: `url("${assetPath("/images/ash-wing-preview.png")}")` }} role="img" aria-label="双発・長翼の飛行機型潜水艦 ASH WING" />
                   : <div className="disc-sub"><i /><i /><i /></div>}
                 <span className="scanline" />
               </div>
@@ -120,6 +121,7 @@ export default function GameShell() {
               <h3>選択中の機体</h3>
               <div className="vehicle-select">
                 <button
+                  style={{ backgroundImage: `url("${assetPath("/images/ryuou-preview.png")}")` }}
                   className={"ryuou-option " + (store.selectedVehicle === "ryuou" ? "selected" : "")}
                   onClick={() => store.selectVehicle("ryuou")}
                 >
@@ -128,6 +130,7 @@ export default function GameShell() {
                 </button>
                 <button
                   disabled={!store.unlockedVehicles.includes("corback")}
+                  style={{ backgroundImage: `url("${assetPath("/images/corback-preview.png")}")` }}
                   className={"corback-option " + (store.selectedVehicle === "corback" ? "selected" : "")}
                   onClick={() => store.selectVehicle("corback")}
                 >
