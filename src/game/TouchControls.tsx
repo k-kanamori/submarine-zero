@@ -4,9 +4,15 @@ import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 
 export function createTouchInput() {
   return {
-    moveX: 0, moveY: 0, lookX: 0, lookY: 0, keys: new Set<string>(), pressed: new Set<string>(),
+    moveX: 0, moveY: 0, lookX: 0, lookY: 0, reverseLookY: false,
+    keys: new Set<string>(), pressed: new Set<string>(),
     setMove(x: number, y: number) { this.moveX = x; this.moveY = -y; },
-    setLook(x: number, y: number) { this.lookX = x; this.lookY = y; },
+    setLook(x: number, y: number) { this.lookX = x; this.lookY = this.reverseLookY ? -y : y; },
+    toggleReverse() {
+      this.reverseLookY = !this.reverseLookY;
+      this.lookY = -this.lookY;
+      return this.reverseLookY;
+    },
   };
 }
 export type TouchInput = ReturnType<typeof createTouchInput>;
@@ -78,6 +84,7 @@ function ActionButton({ label, action, input, className }: {
 
 export default function TouchControls({ input }: { input: TouchInput }) {
   const [utilitiesOpen, setUtilitiesOpen] = useState(false);
+  const [reversed, setReversed] = useState(input.reverseLookY);
   const utilitiesId = useId();
   useEffect(() => {
     const reset = () => resetTouchInput(input);
@@ -119,6 +126,16 @@ export default function TouchControls({ input }: { input: TouchInput }) {
       <div className="touch-combat">
         <ActionButton action="Lock" label="ロック" input={input} />
         <ActionButton action="Fire" label="発射" className="touch-fire" input={input} />
+        <button className="touch-reverse" aria-label="旋回パッドの上下を反転" aria-pressed={reversed}
+          onPointerDown={(event) => {
+            if (event.pointerType === "mouse" && event.button !== 0) return;
+            event.preventDefault();
+            setReversed(input.toggleReverse());
+          }} onClick={(event) => {
+            if (event.detail === 0) setReversed(input.toggleReverse());
+          }}>
+          <span>REVERSE</span><small>{reversed ? "ON" : "OFF"}</small>
+        </button>
       </div>
       <Stick label="旋回" onMove={(x, y) => input.setLook(x, y)} />
     </div>

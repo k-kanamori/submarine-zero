@@ -1311,7 +1311,11 @@ button { touch-action: manipulation; }
 .touch-movement { left: calc(var(--safe-left) + 12px); }
 .touch-aim { right: calc(var(--safe-right) + 12px); }
 .touch-holds, .touch-combat { display: flex; gap: 4px; }
-.touch-combat button { min-width: 60px; }
+.touch-combat button { width: 44px; min-width: 44px; padding-inline: 4px; }
+.touch-combat .touch-reverse { width: 56px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; font-size: 9px; }
+.touch-reverse small { font-size: 10px; color: var(--muted); }
+.touch-reverse[aria-pressed="true"] { border-color: var(--cyan); background: #155054; }
+.touch-reverse[aria-pressed="true"] small { color: var(--cyan); }
 .touch-combat .touch-fire { border-color: #f8ae83; color: #ffe4ce; background: rgba(105, 49, 29, 0.85); }
 .touch-stick { position: relative; width: 96px; height: 96px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(127, 243, 229, 0.5); background: radial-gradient(circle, rgba(21, 77, 81, 0.5), rgba(2, 19, 26, 0.8)); }
 .touch-stick i { width: 36px; height: 36px; border: 1px solid var(--cyan); border-radius: 50%; background: rgba(93, 209, 199, 0.25); }
