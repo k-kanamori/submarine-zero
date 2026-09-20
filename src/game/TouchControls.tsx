@@ -101,6 +101,16 @@ export default function TouchControls({ input }: { input: TouchInput }) {
       <div id={utilitiesId} className="touch-utilities" hidden={!utilitiesOpen}>
         {[["Sonar", "ソナー"], ["CycleWeapon", "魚雷切替"], ["Mine", "機雷"], ["Decoy", "デコイ"]].map(([action, label]) =>
           <ActionButton key={action} action={action} label={label} input={input} />)}
+        <button className="touch-reverse" aria-label="旋回パッドの上下を反転" aria-pressed={reversed}
+          onPointerDown={(event) => {
+            if (event.pointerType === "mouse" && event.button !== 0) return;
+            event.preventDefault();
+            setReversed(input.toggleReverse());
+          }} onClick={(event) => {
+            if (event.detail === 0) setReversed(input.toggleReverse());
+          }}>
+          <span>REVERSE</span><small>{reversed ? "ON" : "OFF"}</small>
+        </button>
       </div>
       <button className="touch-utility-toggle" aria-expanded={utilitiesOpen} aria-controls={utilitiesId}
         aria-label={utilitiesOpen ? "補助操作を隠す" : "補助操作を表示"}
@@ -111,7 +121,7 @@ export default function TouchControls({ input }: { input: TouchInput }) {
         }} onClick={(event) => {
           if (event.detail === 0) setUtilitiesOpen((open) => !open);
         }}>
-        {utilitiesOpen ? "閉じる ▾" : "補助操作 ▴"}
+        {utilitiesOpen ? "閉じる" : "補助操作 ▴"}
       </button>
     </div>
     <div className="touch-movement">
@@ -126,16 +136,6 @@ export default function TouchControls({ input }: { input: TouchInput }) {
       <div className="touch-combat">
         <ActionButton action="Lock" label="ロック" input={input} />
         <ActionButton action="Fire" label="発射" className="touch-fire" input={input} />
-        <button className="touch-reverse" aria-label="旋回パッドの上下を反転" aria-pressed={reversed}
-          onPointerDown={(event) => {
-            if (event.pointerType === "mouse" && event.button !== 0) return;
-            event.preventDefault();
-            setReversed(input.toggleReverse());
-          }} onClick={(event) => {
-            if (event.detail === 0) setReversed(input.toggleReverse());
-          }}>
-          <span>REVERSE</span><small>{reversed ? "ON" : "OFF"}</small>
-        </button>
       </div>
       <Stick label="旋回" onMove={(x, y) => input.setLook(x, y)} />
     </div>
