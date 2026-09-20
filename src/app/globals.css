@@ -1210,3 +1210,127 @@ kbd {
     grid-template-columns: 1fr;
   }
 }
+
+/* Keep menus scrollable inside the fixed game viewport. */
+.briefing-screen { height: 100%; min-height: 0; }
+.result-screen { align-items: safe center; }
+button { touch-action: manipulation; }
+.touch-device {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}
+.touch-device button { min-height: 44px; }
+.touch-device .title-screen,
+.touch-device .briefing-screen,
+.touch-device .result-screen {
+  padding-top: max(1rem, var(--safe-top));
+  padding-right: max(1rem, var(--safe-right));
+  padding-bottom: max(1rem, var(--safe-bottom));
+  padding-left: max(1rem, var(--safe-left));
+}
+.touch-device .title-screen { overflow-y: auto; }
+.touch-device .title-screen::after { display: none; }
+.touch-device .modal-backdrop,
+.touch-device .pause-overlay {
+  padding: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) max(12px, var(--safe-left));
+}
+.touch-device .controls-modal { max-height: 100%; }
+.touch-device .pause-panel { max-height: 100%; overflow-y: auto; padding: 1.5rem; }
+.touch-device .briefing-grid { grid-template-columns: minmax(0, 1fr); max-width: 44rem; }
+.touch-device .title-menu { position: relative; }
+.touch-device .title-coordinates { display: none; }
+
+@media (max-width: 760px) {
+  .title-screen { padding: 1.25rem; gap: 1rem; }
+  .title-menu { width: 100%; }
+  .briefing-screen { padding: 1rem; }
+  .briefing-header { gap: 1rem; }
+  .briefing-header p { text-align: right; font-size: 0.6rem; }
+  .briefing-grid { gap: 1.5rem; grid-template-columns: minmax(0, 1fr); }
+  .mission-card { padding: 1rem; min-width: 0; }
+  .mission-visual { height: 24vh; min-height: 10rem; }
+  .vehicle-select { grid-template-columns: minmax(0, 1fr); }
+  .vehicle-select button { min-height: 80px; }
+  .briefing-copy blockquote, .result-panel blockquote { padding: 1rem; margin-bottom: 1.5rem; }
+  .briefing-actions, .result-actions { flex-wrap: wrap; margin-top: 1.5rem; }
+  .briefing-actions button, .result-actions button { flex: 1 1 8rem; min-width: 0; }
+  .result-screen { padding: 1rem; }
+  .result-panel { padding: 1.25rem; }
+  .result-panel h2 { font-size: 1.8rem; padding-right: 2rem; }
+  .result-rank { font-size: 3.5rem; margin-top: -2.8rem; }
+  .controls-modal { padding: 1.25rem; }
+  .controls-modal h2 { padding-right: 2rem; }
+  .control-grid div { gap: 1rem; }
+  .control-grid span { text-align: right; }
+}
+
+.touch-game { touch-action: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.touch-game button:hover { transform: none; }
+.touch-game button:active { border-color: var(--cyan); background: #155054; }
+.touch-game .hud-top-left { top: calc(var(--safe-top) + 12px); left: calc(var(--safe-left) + 12px); width: 46%; }
+.touch-game .hud-top-right { top: calc(var(--safe-top) + 10px); right: calc(var(--safe-right) + 66px); gap: 0 6px; }
+.touch-game .hud-top-right strong { font-size: 1.35rem; }
+.touch-game .hud-top-right span { display: none; }
+.touch-game .hud-top-right small { font-size: 0.6rem; }
+.touch-game .smoke-warning { position: absolute; right: 0; top: 30px; width: 150px; font-size: 0.6rem; }
+.touch-game .hp-track { width: 90px; }
+.touch-game .hp-row strong { font-size: 0.8rem; }
+.touch-game .hud-label { font-size: 0.55rem; }
+.touch-game .objective { margin-top: 10px; padding: 4px 6px; font-size: 0.65rem; }
+.touch-game .objective span { display: none; }
+.touch-game .pause-button { top: calc(var(--safe-top) + 10px); right: calc(var(--safe-right) + 12px); width: 44px; height: 44px; }
+.touch-game .boss-health { top: calc(var(--safe-top) + 114px); width: 60%; }
+.touch-game .boss-health span { font-size: 0.55rem; }
+.touch-game .hud-status { top: calc(var(--safe-top) + 92px); left: calc(var(--safe-left) + 12px); font-size: 0.5rem; }
+.touch-game .sonar-panel { left: calc(var(--safe-left) + 12px); bottom: calc(var(--safe-bottom) + 244px); gap: 6px; }
+.touch-game .sonar-grid { width: 66px; height: 66px; }
+.touch-game .sonar-copy { min-width: 0; }
+.touch-game .sonar-copy strong { font-size: 0.7rem; }
+.touch-game .weapon-panel { right: calc(var(--safe-right) + 12px); bottom: calc(var(--safe-bottom) + 244px); width: 130px; padding: 6px; }
+.touch-game .weapon-panel p strong { font-size: 0.7rem; }
+.touch-game .weapon-panel small { font-size: 0.5rem; }
+.touch-game .dialogue-box { bottom: calc(var(--safe-bottom) + 320px); width: calc(100% - 24px); padding: 5px 8px; }
+.touch-game .dialogue-box p { font-size: 0.65rem; line-height: 1.5; }
+.touch-game .crosshair { width: 64px; height: 64px; }
+.touch-game .crosshair.locked { width: 52px; height: 52px; }
+.touch-game .telemetry { display: none; }
+.touch-game .game-tip { top: auto; bottom: calc(var(--safe-bottom) + 221px); width: 100%; text-align: center; font-size: 0.6rem; }
+
+.touch-controls { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
+.touch-controls button, .touch-stick { pointer-events: auto; touch-action: none; }
+.touch-controls button { padding: 6px 8px; min-width: 44px; min-height: 44px; border-radius: 12px; font-size: 11px; letter-spacing: 0; background: rgba(3, 25, 31, 0.88); }
+.touch-utilities { position: absolute; bottom: calc(var(--safe-bottom) + 8px); left: calc(var(--safe-left) + 12px); right: calc(var(--safe-right) + 12px); display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.touch-movement, .touch-aim { position: absolute; bottom: calc(var(--safe-bottom) + 62px); display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.touch-movement { left: calc(var(--safe-left) + 12px); }
+.touch-aim { right: calc(var(--safe-right) + 12px); }
+.touch-holds, .touch-combat { display: flex; gap: 4px; }
+.touch-combat button { min-width: 60px; }
+.touch-combat .touch-fire { border-color: #f8ae83; color: #ffe4ce; background: rgba(105, 49, 29, 0.85); }
+.touch-stick { position: relative; width: 96px; height: 96px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(127, 243, 229, 0.5); background: radial-gradient(circle, rgba(21, 77, 81, 0.5), rgba(2, 19, 26, 0.8)); }
+.touch-stick i { width: 36px; height: 36px; border: 1px solid var(--cyan); border-radius: 50%; background: rgba(93, 209, 199, 0.25); }
+.touch-stick span { position: absolute; top: 7px; font-size: 10px; color: #b9e7e1; }
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .touch-device .title-screen { grid-template-columns: 1fr 1fr; gap: 2rem; }
+  .touch-device .title-copy, .touch-device .title-menu { align-self: center; padding-bottom: 0; }
+  .touch-device .title-copy h1 strong { font-size: 5rem; }
+  .touch-device .title-copy .eyebrow { font-size: 0.6rem; }
+  .touch-device .emblem { left: 48%; top: 42%; opacity: 0.4; }
+  .touch-game .hud-top-left { width: 30%; }
+  .touch-game .boss-health { top: calc(var(--safe-top) + 12px); width: 32%; }
+  .touch-game .objective { font-size: 0.6rem; }
+  .touch-game .sonar-panel { top: calc(var(--safe-top) + 102px); bottom: auto; }
+  .touch-game .sonar-grid { width: 54px; height: 54px; }
+  .touch-game .weapon-panel { top: calc(var(--safe-top) + 72px); bottom: auto; }
+  .touch-game .dialogue-box { top: calc(var(--safe-top) + 52px); bottom: auto; width: 38%; }
+  .touch-game .dialogue-box p { font-size: 0.6rem; }
+  .touch-game .game-tip { bottom: calc(var(--safe-bottom) + 110px); }
+  .touch-utilities { width: 200px; grid-template-columns: repeat(2, 1fr); left: 50%; right: auto; transform: translateX(-50%); }
+  .touch-movement, .touch-aim { bottom: calc(var(--safe-bottom) + 8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ocean-grain, .emblem-ring, .scanline { animation: none; }
+}

@@ -5,6 +5,8 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import TouchControls, { createTouchInput, resetTouchInput, type TouchInput } from "./TouchControls";
+import { useTouchDevice } from "./useTouchDevice";
 import type { MissionResult } from "./store";
 import { sphereBoxPenetration } from "./collision";
 import { nextLockTarget } from "./targetLock";
@@ -443,6 +445,7 @@ function IceEnvironment({ pulse }: { pulse: SonarPulse }) {
 }
 
 type GameSceneProps = {
+  touchInput: TouchInput;
   stageId: StageId;
   vehicle: string;
   paused: boolean;
@@ -452,6 +455,7 @@ type GameSceneProps = {
 };
 
 const GameScene = memo(function GameScene({
+  touchInput,
   stageId,
   vehicle,
   paused,
@@ -537,6 +541,7 @@ const GameScene = memo(function GameScene({
   useEffect(() => {
     const state = input.current;
     if (paused) {
+      resetTouchInput(touchInput);
       state.keys.clear();
       state.pressed.clear();
       state.mouseX = state.mouseY = 0;
@@ -569,7 +574,7 @@ const GameScene = memo(function GameScene({
       synth.current.unlock();
       if (document.pointerLockElement !== gl.domElement) {
         // Embedded browsers can decline pointer lock; keyboard steering still works.
-        void gl.domElement.requestPointerLock()?.catch(() => undefined);
+        void gl.domElement.requestPointerLock?.()?.catch(() => undefined);
       }
       if (event.button === 0) state.pressed.add("Fire");
       if (event.button === 2) state.pressed.add("Lock");
@@ -580,9 +585,16 @@ const GameScene = memo(function GameScene({
       event.preventDefault();
     };
     const onContext = (event: MouseEvent) => event.preventDefault();
-    const onVisibility = () => {
-      if (document.hidden && !paused) onPause();
+    const onPointerDown = () => { if (!paused) synth.current.unlock(); };
+    let autoPaused = false;
+    const onBlur = () => {
+      state.keys.clear();
+      resetTouchInput(touchInput);
+      if (!paused && !autoPaused) { autoPaused = true; onPause(); }
     };
+    const onVisibility = () => { if (document.hidden) onBlur(); };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("blur", onBlur);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("mousemove", onMouseMove);
@@ -591,6 +603,8 @@ const GameScene = memo(function GameScene({
     gl.domElement.addEventListener("contextmenu", onContext);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("blur", onBlur);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("mousemove", onMouseMove);
@@ -599,7 +613,7 @@ const GameScene = memo(function GameScene({
       gl.domElement.removeEventListener("contextmenu", onContext);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [gl, onPause, paused]);
+  }, [gl, onPause, paused, touchInput]);
 
   const spawnExplosion = useCallback((position: THREE.Vector3, size: number, color = "#ff9c55") => {
     const effect = explosions.find((item) => !item.active);
@@ -768,6 +782,10 @@ const GameScene = memo(function GameScene({
       return;
     }
 
+    for (const action of touchInput.pressed) controls.pressed.add(action);
+    touchInput.pressed.clear();
+    const held = (code: string) => controls.keys.has(code) || touchInput.keys.has(code);
+
     elapsed.current += dt;
     weaponCooldown.current = Math.max(0, weaponCooldown.current - dt);
     sonarCooldown.current = Math.max(0, sonarCooldown.current - dt);
@@ -790,25 +808,25 @@ const GameScene = memo(function GameScene({
       if (respawnTimer.current <= 0) respawn();
     } else if (!completed.current && playerMesh.current) {
       const thrust =
-        (controls.keys.has("KeyW") ? 1 : 0) -
-        (controls.keys.has("KeyS") ? 1 : 0) +
-        padThrust;
+        (held("KeyW") ? 1 : 0) -
+        (held("KeyS") ? 1 : 0) +
+        padThrust + touchInput.moveY;
       const strafe =
-        (controls.keys.has("KeyD") ? 1 : 0) -
-        (controls.keys.has("KeyA") ? 1 : 0) +
-        padStrafe;
+        (held("KeyD") ? 1 : 0) -
+        (held("KeyA") ? 1 : 0) +
+        padStrafe + touchInput.moveX;
       const vertical =
-        (controls.keys.has("Space") ? 1 : 0) -
-        (controls.keys.has("ControlLeft") || controls.keys.has("ControlRight") ? 1 : 0) +
+        (held("Space") ? 1 : 0) -
+        (held("ControlLeft") || held("ControlRight") ? 1 : 0) +
         padVertical;
       const keyboardYaw =
-        (controls.keys.has("ArrowRight") ? 1 : 0) -
-        (controls.keys.has("ArrowLeft") ? 1 : 0);
+        (held("ArrowRight") ? 1 : 0) -
+        (held("ArrowLeft") ? 1 : 0);
       const keyboardPitch =
-        (controls.keys.has("ArrowDown") ? 1 : 0) -
-        (controls.keys.has("ArrowUp") ? 1 : 0);
-      yaw.current -= controls.mouseX * 0.0022 + (padYaw + keyboardYaw) * dt * 1.25;
-      pitch.current -= controls.mouseY * 0.0018 + (padPitch + keyboardPitch) * dt * 0.92;
+        (held("ArrowDown") ? 1 : 0) -
+        (held("ArrowUp") ? 1 : 0);
+      yaw.current -= controls.mouseX * 0.0022 + (padYaw + keyboardYaw + touchInput.lookX) * dt * 1.25;
+      pitch.current -= controls.mouseY * 0.0018 + (padPitch + keyboardPitch + touchInput.lookY) * dt * 0.92;
       pitch.current = clamp(pitch.current, -0.62, 0.62);
       controls.mouseX = 0;
       controls.mouseY = 0;
@@ -817,7 +835,7 @@ const GameScene = memo(function GameScene({
       playerMesh.current.quaternion.slerp(workQ, 1 - Math.exp(-dt * 8));
       const forward = workA.set(0, 0, -1).applyQuaternion(playerMesh.current.quaternion);
       const right = workB.set(1, 0, 0).applyQuaternion(playerMesh.current.quaternion);
-      const boosting = controls.keys.has("ShiftLeft") || Boolean(pad?.buttons[10]?.pressed);
+      const boosting = held("ShiftLeft") || Boolean(pad?.buttons[10]?.pressed);
       const maxSpeed = boosting ? 25 : vehicle === "corback" ? 16 : 18;
       const targetVelocity = scratch.targetVelocity.set(0, 0, 0)
         .addScaledVector(forward, clamp(thrust, -1, 1) * maxSpeed)
@@ -1513,10 +1531,11 @@ const GameScene = memo(function GameScene({
   );
 });
 
-function Hud({ hud, stageId }: { hud: HudState; stageId: StageId }) {
+function Hud({ hud, stageId, touch }: { hud: HudState; stageId: StageId; touch: boolean }) {
   const minutes = Math.floor(hud.elapsed / 60);
   const seconds = String(Math.floor(hud.elapsed % 60)).padStart(2, "0");
   const hpPercent = (hud.hp / hud.maxHp) * 100;
+  const dialogueText = hud.dialogue.replace(/^NIX「|」$/g, "");
   return (
     <div className="game-hud" aria-live="polite">
       <div className="hud-top-left">
@@ -1532,7 +1551,7 @@ function Hud({ hud, stageId }: { hud: HudState; stageId: StageId }) {
         <span>{STAGES[stageId].sector}</span>
         <strong>{minutes}:{seconds}</strong>
         <small>HOSTILES {hud.kills}/10</small>
-        {stageId === 2 && <p className="smoke-warning">{hud.smoke > .25 ? "濃い噴煙内 // Q ソナー" : "火山性噴煙 // 視界不良"}</p>}
+        {stageId === 2 && <p className="smoke-warning">{hud.smoke > .25 ? (touch ? "濃い噴煙内 // ソナー" : "濃い噴煙内 // Q ソナー") : "火山性噴煙 // 視界不良"}</p>}
       </div>
 
       <div className={"crosshair " + (hud.lockedName ? "locked" : "")}>
@@ -1570,7 +1589,7 @@ function Hud({ hud, stageId }: { hud: HudState; stageId: StageId }) {
         <div className="reload-track">
           <i style={{ width: (hud.cooldown <= 0 ? 100 : Math.max(0, 100 - hud.cooldown * 38)) + "%" }} />
         </div>
-        <small>{hud.cooldown <= 0 ? "ARMED" : "RELOADING"} {"//"} TAB TO SWITCH</small>
+        <small>{hud.cooldown <= 0 ? "ARMED" : "RELOADING"} {"//"} {touch ? "魚雷切替" : "TAB TO SWITCH"}</small>
       </div>
 
       {hud.bossActive && (
@@ -1582,7 +1601,7 @@ function Hud({ hud, stageId }: { hud: HudState; stageId: StageId }) {
 
       <div className="dialogue-box">
         <span>AI // NIX</span>
-        <p>{hud.dialogue.replace(/^NIX「|」$/g, "")}</p>
+        <p>{touch ? dialogueText.replace("Qのソナー", "ソナーボタン").replace("Eで選べる", "ロックボタンで選べる") : dialogueText}</p>
       </div>
 
       <div className="hud-status">
@@ -1645,12 +1664,15 @@ export default function UnderwaterGame({
 }) {
   const [hud, setHud] = useState<HudState>({ ...initialHud, depth: STAGES[stageId].startDepth,
     dialogue: STAGES[stageId].intro, bossHp: STAGES[stageId].bossHp, maxHp: vehicle === "corback" ? 150 : 100 });
+  const touch = useTouchDevice();
+  const [touchInput] = useState(createTouchInput);
   const [paused, setPaused] = useState(false);
   const togglePause = useCallback(() => setPaused((value) => !value), []);
 
   return (
-    <section className="game-screen">
+    <section className={"game-screen" + (touch ? " touch-game" : "")}>
       <GameViewport
+        touchInput={touchInput}
         stageId={stageId}
         vehicle={vehicle}
         paused={paused}
@@ -1658,9 +1680,10 @@ export default function UnderwaterGame({
         onHud={setHud}
         onComplete={onComplete}
       />
-      <Hud hud={hud} stageId={stageId} />
-      <button className="pause-button" onClick={togglePause}>Ⅱ</button>
-      <div className="game-tip">クリックで操艦 // Q ソナー // E ロック // 左クリック 発射</div>
+      <Hud hud={hud} stageId={stageId} touch={touch} />
+      {touch && !paused && <TouchControls input={touchInput} />}
+      <button aria-label="ポーズ" className="pause-button" onClick={togglePause}>Ⅱ</button>
+      <div className="game-tip">{touch ? "左パッドで移動・右パッドで旋回" : "クリックで操艦 // Q ソナー // E ロック // 左クリック 発射"}</div>
 
       {paused && (
         <div className="pause-overlay">

@@ -3,6 +3,7 @@
 import { assetPath } from "../lib/base-path";
 import dynamic from "next/dynamic";
 import { useSyncExternalStore } from "react";
+import { useTouchDevice } from "./useTouchDevice";
 import { useGameStore } from "./store";
 import { STAGES, type StageId } from "./stages";
 
@@ -31,6 +32,18 @@ const controls = [
   ["Esc", "ポーズ"],
 ];
 
+const touchControls = [
+  ["左パッド", "前進・後退・左右移動"],
+  ["右パッド", "上下左右に旋回"],
+  ["上昇 / 下降", "押している間、深度変更"],
+  ["加速", "押している間、ブースト"],
+  ["ソナー", "周囲の敵を探知"],
+  ["ロック", "標的ロック・対象切替"],
+  ["発射 / 魚雷切替", "魚雷発射・種類変更"],
+  ["機雷 / デコイ", "設置・敵の魚雷を誘導"],
+  ["Ⅱ", "ポーズ"],
+];
+
 function Emblem() {
   return (
     <div className="emblem" aria-hidden="true">
@@ -47,6 +60,7 @@ export default function GameShell() {
     () => true,
     () => false,
   );
+  const touch = useTouchDevice();
   const store = useGameStore();
   const mission = STAGES[store.selectedStage];
   const resultStage = store.lastResult?.stageId ?? store.selectedStage;
@@ -54,7 +68,7 @@ export default function GameShell() {
   if (!mounted) return <div className="app-shell" />;
 
   return (
-    <main className="app-shell">
+    <main className={"app-shell" + (touch ? " touch-device" : "")}>
       {store.screen === "title" && (
         <section className="title-screen">
           <div className="ocean-grain" />
@@ -199,17 +213,16 @@ export default function GameShell() {
       {store.showControls && (
         <div className="modal-backdrop" onClick={() => store.setShowControls(false)}>
           <section className="controls-modal" onClick={(event) => event.stopPropagation()}>
-            <button className="modal-close" onClick={() => store.setShowControls(false)}>×</button>
+            <button aria-label="操作方法を閉じる" className="modal-close" onClick={() => store.setShowControls(false)}>×</button>
             <p className="eyebrow">CONTROL SCHEME</p>
             <h2>操艦マニュアル</h2>
             <div className="control-grid">
-              {controls.map(([key, action]) => (
+              {(touch ? touchControls : controls).map(([key, action]) => (
                 <div key={key}><kbd>{key}</kbd><span>{action}</span></div>
               ))}
             </div>
             <p className="controller-note">
-              ゲームパッド対応：左スティックで移動、右スティックで旋回、LB/RBで下降・上昇、
-              LTでロック、RTで射撃。
+              {touch ? "両手で同時に操作できます。横向きにすると海域を広く見渡せます。縦向きでもプレイできます。" : "ゲームパッド対応：左スティックで移動、右スティックで旋回、LB/RBで下降・上昇、LTでロック、RTで射撃。"}
             </p>
           </section>
         </div>
