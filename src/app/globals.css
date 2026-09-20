@@ -1300,7 +1300,13 @@ button { touch-action: manipulation; }
 .touch-controls { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
 .touch-controls button, .touch-stick { pointer-events: auto; touch-action: none; }
 .touch-controls button { padding: 6px 8px; min-width: 44px; min-height: 44px; border-radius: 12px; font-size: 11px; letter-spacing: 0; background: rgba(3, 25, 31, 0.88); }
-.touch-utilities { position: absolute; bottom: calc(var(--safe-bottom) + 8px); left: calc(var(--safe-left) + 12px); right: calc(var(--safe-right) + 12px); display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.touch-utility-drawer { position: absolute; bottom: calc(var(--safe-bottom) + 8px); left: calc(var(--safe-left) + 12px); right: calc(var(--safe-right) + 12px); display: flex; justify-content: center; gap: 6px; }
+.touch-utilities { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); flex: 1; min-width: 0; gap: 6px; }
+.touch-utilities[hidden] { display: none; }
+.touch-utilities button { padding-inline: 4px; }
+.touch-utility-toggle { flex: 0 0 auto; }
+.touch-utility-toggle[aria-expanded="false"] { width: 112px; }
+.touch-utility-toggle[aria-expanded="true"] { border-color: var(--cyan); }
 .touch-movement, .touch-aim { position: absolute; bottom: calc(var(--safe-bottom) + 62px); display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .touch-movement { left: calc(var(--safe-left) + 12px); }
 .touch-aim { right: calc(var(--safe-right) + 12px); }
@@ -1325,8 +1331,10 @@ button { touch-action: manipulation; }
   .touch-game .weapon-panel { top: calc(var(--safe-top) + 72px); bottom: auto; }
   .touch-game .dialogue-box { top: calc(var(--safe-top) + 52px); left: 32%; width: 36%; }
   .touch-game .dialogue-box p { font-size: 0.6rem; }
-  .touch-game .game-tip { bottom: calc(var(--safe-bottom) + 110px); }
-  .touch-utilities { width: 200px; grid-template-columns: repeat(2, 1fr); left: 50%; right: auto; transform: translateX(-50%); }
+  .touch-game .game-tip { bottom: calc(var(--safe-bottom) + 164px); }
+  .touch-utility-drawer { width: 200px; flex-direction: column; align-items: stretch; left: 50%; right: auto; transform: translateX(-50%); }
+  .touch-utilities { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .touch-utility-toggle[aria-expanded="false"] { align-self: center; }
   .touch-movement, .touch-aim { bottom: calc(var(--safe-bottom) + 8px); }
 }
 

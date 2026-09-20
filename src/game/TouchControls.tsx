@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 
 export function createTouchInput() {
   return {
@@ -77,6 +77,8 @@ function ActionButton({ label, action, input, className }: {
 }
 
 export default function TouchControls({ input }: { input: TouchInput }) {
+  const [utilitiesOpen, setUtilitiesOpen] = useState(false);
+  const utilitiesId = useId();
   useEffect(() => {
     const reset = () => resetTouchInput(input);
     window.addEventListener("blur", reset);
@@ -88,9 +90,22 @@ export default function TouchControls({ input }: { input: TouchInput }) {
     };
   }, [input]);
   return <div className="touch-controls" aria-label="タッチ操艦">
-    <div className="touch-utilities">
-      {[["Sonar", "ソナー"], ["CycleWeapon", "魚雷切替"], ["Mine", "機雷"], ["Decoy", "デコイ"]].map(([action, label]) =>
-        <ActionButton key={action} action={action} label={label} input={input} />)}
+    <div className="touch-utility-drawer">
+      <div id={utilitiesId} className="touch-utilities" hidden={!utilitiesOpen}>
+        {[["Sonar", "ソナー"], ["CycleWeapon", "魚雷切替"], ["Mine", "機雷"], ["Decoy", "デコイ"]].map(([action, label]) =>
+          <ActionButton key={action} action={action} label={label} input={input} />)}
+      </div>
+      <button className="touch-utility-toggle" aria-expanded={utilitiesOpen} aria-controls={utilitiesId}
+        aria-label={utilitiesOpen ? "補助操作を隠す" : "補助操作を表示"}
+        onPointerDown={(event) => {
+          if (event.pointerType === "mouse" && event.button !== 0) return;
+          event.preventDefault();
+          setUtilitiesOpen((open) => !open);
+        }} onClick={(event) => {
+          if (event.detail === 0) setUtilitiesOpen((open) => !open);
+        }}>
+        {utilitiesOpen ? "閉じる ▾" : "補助操作 ▴"}
+      </button>
     </div>
     <div className="touch-movement">
       <div className="touch-holds">
