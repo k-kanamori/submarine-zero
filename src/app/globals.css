@@ -1042,12 +1042,11 @@ kbd {
 }
 
 .dialogue-box {
-  left: 50%;
-  bottom: 7.4rem;
-  width: min(38rem, 54vw);
+  left: 2rem;
+  top: 12rem;
+  width: min(25rem, 36vw);
   padding: 0.7rem 1rem;
   border-left: 2px solid var(--cyan);
-  transform: translateX(-50%);
   background: linear-gradient(90deg, rgba(1, 14, 18, 0.2), rgba(1, 14, 18, 0.82) 20%, rgba(1, 14, 18, 0.82) 80%, rgba(1, 14, 18, 0.2));
 }
 
@@ -1061,7 +1060,7 @@ kbd {
   margin: 0.25rem 0 0;
   font-family: "Noto Sans JP", sans-serif;
   font-size: 0.78rem;
-  text-align: center;
+  text-align: left;
 }
 
 .hud-status {
@@ -1176,7 +1175,7 @@ kbd {
   }
 
   .dialogue-box {
-    bottom: 6.5rem;
+    left: 0.8rem;
     width: 84vw;
   }
 }
@@ -1281,7 +1280,7 @@ button { touch-action: manipulation; }
 .touch-game .objective { margin-top: 10px; padding: 4px 6px; font-size: 0.65rem; }
 .touch-game .objective span { display: none; }
 .touch-game .pause-button { top: calc(var(--safe-top) + 10px); right: calc(var(--safe-right) + 12px); width: 44px; height: 44px; }
-.touch-game .boss-health { top: calc(var(--safe-top) + 114px); width: 60%; }
+.touch-game .boss-health { top: calc(var(--safe-top) + 198px); width: 60%; }
 .touch-game .boss-health span { font-size: 0.55rem; }
 .touch-game .hud-status { top: calc(var(--safe-top) + 92px); left: calc(var(--safe-left) + 12px); font-size: 0.5rem; }
 .touch-game .sonar-panel { left: calc(var(--safe-left) + 12px); bottom: calc(var(--safe-bottom) + 244px); gap: 6px; }
@@ -1291,7 +1290,7 @@ button { touch-action: manipulation; }
 .touch-game .weapon-panel { right: calc(var(--safe-right) + 12px); bottom: calc(var(--safe-bottom) + 244px); width: 130px; padding: 6px; }
 .touch-game .weapon-panel p strong { font-size: 0.7rem; }
 .touch-game .weapon-panel small { font-size: 0.5rem; }
-.touch-game .dialogue-box { bottom: calc(var(--safe-bottom) + 320px); width: calc(100% - 24px); padding: 5px 8px; }
+.touch-game .dialogue-box { top: calc(var(--safe-top) + 118px); left: calc(var(--safe-left) + 12px); width: calc(100% - var(--safe-left) - var(--safe-right) - 24px); padding: 5px 8px; }
 .touch-game .dialogue-box p { font-size: 0.65rem; line-height: 1.5; }
 .touch-game .crosshair { width: 64px; height: 64px; }
 .touch-game .crosshair.locked { width: 52px; height: 52px; }
@@ -1324,7 +1323,7 @@ button { touch-action: manipulation; }
   .touch-game .sonar-panel { top: calc(var(--safe-top) + 102px); bottom: auto; }
   .touch-game .sonar-grid { width: 54px; height: 54px; }
   .touch-game .weapon-panel { top: calc(var(--safe-top) + 72px); bottom: auto; }
-  .touch-game .dialogue-box { top: calc(var(--safe-top) + 52px); bottom: auto; width: 38%; }
+  .touch-game .dialogue-box { top: calc(var(--safe-top) + 52px); left: 32%; width: 36%; }
   .touch-game .dialogue-box p { font-size: 0.6rem; }
   .touch-game .game-tip { bottom: calc(var(--safe-bottom) + 110px); }
   .touch-utilities { width: 200px; grid-template-columns: repeat(2, 1fr); left: 50%; right: auto; transform: translateX(-50%); }

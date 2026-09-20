@@ -61,6 +61,21 @@ function HoldButton({ label, code, input }: { label: string; code: string; input
   }} onPointerUp={release} onPointerCancel={release} onLostPointerCapture={release}>{label}</button>;
 }
 
+function ActionButton({ label, action, input, className }: {
+  label: string; action: string; input: TouchInput; className?: string;
+}) {
+  return <button className={className} onPointerDown={(event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    // Each finger can activate an action while another finger holds a stick.
+    // Do not depend on the compatibility click generated after a touch ends.
+    event.preventDefault();
+    input.pressed.add(action);
+  }} onClick={(event) => {
+    // Preserve keyboard/assistive activation without repeating pointer actions.
+    if (event.detail === 0) input.pressed.add(action);
+  }}>{label}</button>;
+}
+
 export default function TouchControls({ input }: { input: TouchInput }) {
   useEffect(() => {
     const reset = () => resetTouchInput(input);
@@ -75,7 +90,7 @@ export default function TouchControls({ input }: { input: TouchInput }) {
   return <div className="touch-controls" aria-label="タッチ操艦">
     <div className="touch-utilities">
       {[["Sonar", "ソナー"], ["CycleWeapon", "魚雷切替"], ["Mine", "機雷"], ["Decoy", "デコイ"]].map(([action, label]) =>
-        <button key={action} onClick={() => input.pressed.add(action)}>{label}</button>)}
+        <ActionButton key={action} action={action} label={label} input={input} />)}
     </div>
     <div className="touch-movement">
       <div className="touch-holds">
@@ -87,8 +102,8 @@ export default function TouchControls({ input }: { input: TouchInput }) {
     </div>
     <div className="touch-aim">
       <div className="touch-combat">
-        <button onClick={() => input.pressed.add("Lock")}>ロック</button>
-        <button className="touch-fire" onClick={() => input.pressed.add("Fire")}>発射</button>
+        <ActionButton action="Lock" label="ロック" input={input} />
+        <ActionButton action="Fire" label="発射" className="touch-fire" input={input} />
       </div>
       <Stick label="旋回" onMove={(x, y) => input.setLook(x, y)} />
     </div>

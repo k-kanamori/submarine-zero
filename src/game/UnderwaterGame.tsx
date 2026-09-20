@@ -145,6 +145,7 @@ const initialHud: HudState = {
 };
 
 const clamp = THREE.MathUtils.clamp;
+const DIALOGUE_DURATION = 6;
 const PLAYER_COLLISION_RADIUS = 5.2;
 const SEA_FLOOR_Y = -279;
 const ICE_CEILING_Y = 5;
@@ -509,6 +510,7 @@ const GameScene = memo(function GameScene({
   const lastEnemySpawnAt = useRef(0);
   const lastHudUpdate = useRef(0);
   const dialogue = useRef<string>(mission.intro);
+  const dialogueUntil = useRef(DIALOGUE_DURATION);
   const dialogueFlags = useRef(new Set<string>());
   const cameraTarget = useRef(new THREE.Vector3());
   const workA = useMemo(() => new THREE.Vector3(), []);
@@ -536,6 +538,7 @@ const GameScene = memo(function GameScene({
     if (dialogueFlags.current.has(id)) return;
     dialogueFlags.current.add(id);
     dialogue.current = text;
+    dialogueUntil.current = elapsed.current + DIALOGUE_DURATION;
   }, []);
 
   useEffect(() => {
@@ -1428,7 +1431,7 @@ const GameScene = memo(function GameScene({
         discovered: discovered.current,
         respawning: respawnTimer.current > 0,
         contacts,
-        dialogue: dialogue.current,
+        dialogue: elapsed.current < dialogueUntil.current ? dialogue.current : "",
       });
     }
   });
@@ -1599,10 +1602,10 @@ function Hud({ hud, stageId, touch }: { hud: HudState; stageId: StageId; touch: 
         </div>
       )}
 
-      <div className="dialogue-box">
+      {hud.dialogue && <div className="dialogue-box">
         <span>AI // NIX</span>
         <p>{touch ? dialogueText.replace("Qのソナー", "ソナーボタン").replace("Eで選べる", "ロックボタンで選べる") : dialogueText}</p>
-      </div>
+      </div>}
 
       <div className="hud-status">
         {hud.checkpoint && <span>◆ RECORD POINT</span>}
